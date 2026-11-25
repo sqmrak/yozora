@@ -37,12 +37,7 @@ static int YZFilesRead(void *context, const char *name, uint64_t offset, uint8_t
         }
         *total = (uint64_t)info.st_size;
         size_t length = strlen(name);
-        if (length > 6 && strcmp(name + length - 6, ".plist") == 0)
-            *contentType = "text/xml";
-        else if (length > 13 && strcmp(name + length - 13, ".mobileconfig") == 0)
-            *contentType = "application/x-apple-aspen-config";
-        else
-            *contentType = "application/octet-stream";
+        *contentType = length > 6 && strcmp(name + length - 6, ".plist") == 0 ? "text/xml" : "application/octet-stream";
         int status = 0;
         if (capacity) {
             if (offset >= *total && *total) {

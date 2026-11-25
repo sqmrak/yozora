@@ -8,7 +8,6 @@
 #import "YZCrash.h"
 #import "YZUpdateUI.h"
 #import "YZMediaPlayer.h"
-#import "YZWebShortcut.h"
 #import "YZMotion.h"
 #import "YZCompat.h"
 #import "YZSettings.h"
@@ -397,10 +396,6 @@ static UIImage *YZThumbnailFromView(UIView *view) {
                                                  name:UIKeyboardWillHideNotification object:nil];
     [self showHome];
     [self applyDeveloperSettings];
-    if (_appMode) {
-        [self watchAppEdge];
-        [self loadURL:_appAddress];
-    }
 }
 
 #pragma mark tabs
@@ -872,8 +867,6 @@ static void YZOpenInOtherApp(NSURL *url, BOOL universalOnly, void (^done)(BOOL o
     NSString *scheme = [[url scheme] lowercaseString];
     if ([scheme isEqualToString:@"yozora-auth"])
         return [self beginSignInFromURL:url];
-    if ([scheme isEqualToString:@"yozora-app"])
-        return [self openWebAppURL:url];
     if (![scheme isEqualToString:@"http"] && ![scheme isEqualToString:@"https"])
         return NO;
     NSString *text = [url absoluteString];
@@ -884,64 +877,6 @@ static void YZOpenInOtherApp(NSURL *url, BOOL universalOnly, void (^done)(BOOL o
         [self addBlankTab];
     [self openAddressText:text];
     return YES;
-}
-
-#pragma mark shortcuts of the home screen
-
-// the shortcut asked for a site: it opens in a window of its own without bars, over whatever the browser shows. the window is a
-// popup of the browser (one core, no tab list), and a shortcut that arrives while one is up replaces it
-- (BOOL)openWebAppURL:(NSURL *)url {
-    NSString *address = [YZWebShortcut addressFromLaunchURL:url];
-    if (!address)
-        return NO;
-    [self clearScreenForExternalLink];
-    if (_popupController || self.presentedViewController)
-        return NO;
-    _popupController = [[YZBrowserController alloc] init];
-    _popupController->_popupMode = YES;
-    _popupController->_appMode = YES;
-    _popupController->_appAddress = [address copy];
-    _popupController->_popupOwner = self;
-    [self presentViewController:_popupController animated:NO completion:nil];
-    return YES;
-}
-
-// a stroke from the left edge goes back, and closes the window when there is no page to go back to
-- (void)watchAppEdge {
-    UIGestureRecognizer *edge = nil;
-    // the class and its edges property are ios 7 and later, the armv7 sdk does not declare them
-    Class edgeClass = NSClassFromString(@"UIScreenEdgePanGestureRecognizer");
-    if (edgeClass) {
-        UIPanGestureRecognizer *pan = [[[edgeClass alloc] initWithTarget:self action:@selector(appEdgeStroke:)] autorelease];
-        // UIRectEdgeLeft
-        [pan setValue:[NSNumber numberWithUnsignedInteger:2] forKey:@"edges"];
-        edge = pan;
-    } else {
-        // ios 5 and 6 have no edge recognizer: a swipe to the right does the same
-        UISwipeGestureRecognizer *swipe = [[[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(appEdgeStroke:)] autorelease];
-        swipe.direction = UISwipeGestureRecognizerDirectionRight;
-        edge = swipe;
-    }
-    [self.view addGestureRecognizer:edge];
-}
-
-- (void)appEdgeStroke:(UIGestureRecognizer *)stroke {
-    if ([stroke isKindOfClass:[UIPanGestureRecognizer class]]) {
-        UIPanGestureRecognizer *pan = (UIPanGestureRecognizer *)stroke;
-        if (pan.state != UIGestureRecognizerStateEnded || [pan translationInView:self.view].x < 60)
-            return;
-    } else if (stroke.state != UIGestureRecognizerStateRecognized) {
-        return;
-    }
-    if (_core && yozora_core_back(_core))
-        return;
-    [self closePopup];
-}
-
-- (void)addShortcutPressed {
-    NSString *reason = nil;
-    if (![YZWebShortcut installForAddress:[self currentURL] title:[self currentTab].title reason:&reason])
-        [self showError:reason ? reason : YZT(@"Не удалось подготовить ярлык")];
 }
 
 #pragma mark sign in for another app
@@ -1657,13 +1592,6 @@ static const CGFloat YZTabStripHeight = 44;
     CGFloat covered = (_pageEditing || [self findBarOpen]) ? MAX(reserved, _keyboardHeight) : reserved;
     // with the address bar gone the page starts under the status strip, which stays
     CGFloat pageTop = (_pageReservesTop || wide) ? toolTop + bar : top;
-    // a site opened from a shortcut has no bars: the page takes the whole screen between the safe areas
-    if (_appMode) {
-        pageTop = top;
-        covered = (_pageEditing || [self findBarOpen]) ? MAX(bottom, _keyboardHeight) : bottom;
-        _topBar.hidden = YES;
-        _bottomBar.hidden = YES;
-    }
     // the page stands between the notch insets, the bars keep the full width
     CGRect page = CGRectMake(insets.left, pageTop, MAX((CGFloat)0, inner), MAX((CGFloat)0, height - pageTop - covered));
     _home.frame = page;
@@ -2318,8 +2246,6 @@ static const CGFloat YZTabStripHeight = 44;
             add(YZMenuShare, YZT(@"Поделиться"), YZIconShare);
         add(YZMenuFindInPage, YZT(@"Найти на странице"), YZIconSearch);
         add(YZMenuTranslate, YZT(@"Перевести страницу"), YZIconTranslate);
-        if (!_popupMode)
-            add(YZMenuShortcut, YZT(@"Добавить ярлык на рабочий стол"), YZIconTabNew);
         // the pause of a site is kept for the profile, the private session keeps nothing
         NSString *site = incognito || ![YZSettings blockTrackers] ? nil : [self adblockSite];
         if (site) {
@@ -2417,9 +2343,6 @@ static const CGFloat YZTabStripHeight = 44;
         break;
     case YZMenuAdblock:
         [self toggleAdblockForSite];
-        break;
-    case YZMenuShortcut:
-        [self addShortcutPressed];
         break;
     case YZMenuSettings:
         [self presentSettings];
@@ -3274,7 +3197,6 @@ typedef enum {
         ((YZCoreLinkTarget *)_linkTarget)->controller = nil;
     [_link release];
     [_linkTarget release];
-    [_appAddress release];
     _input.delegate = nil;
     _suggestionsTable.dataSource = nil;
     _suggestionsTable.delegate = nil;

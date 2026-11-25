@@ -11,8 +11,7 @@ typedef enum {
     YZMenuFindInPage,
     YZMenuShare,
     YZMenuTranslate,
-    YZMenuAdblock,
-    YZMenuShortcut
+    YZMenuAdblock
 } YZMenuItem;
 
 @protocol YZMenuViewDelegate;

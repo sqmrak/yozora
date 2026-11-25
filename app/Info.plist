@@ -95,12 +95,6 @@
             </array>
         </dict>
         <dict>
-            <key>CFBundleURLName</key><string>com.sqmrak.yozora.shortcut</string>
-            <key>CFBundleURLSchemes</key><array>
-                <string>yozora-app</string>
-            </array>
-        </dict>
-        <dict>
             <key>CFBundleURLName</key><string>com.sqmrak.yozora.signin</string>
             <key>CFBundleURLSchemes</key><array>
                 <string>yozora-auth</string>

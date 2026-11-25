@@ -45,9 +45,6 @@
     unsigned _leavingVideoID;
     NSMutableDictionary *_mediaPlayers;
     BOOL _popupMode;
-    // a site opened from a shortcut of the home screen: a popup window without bars, its address is loaded when the view is made
-    BOOL _appMode;
-    NSString *_appAddress;
     // the question for a name and a password that a site asked, and the number the core gave it
     YZDialog *_authAlert;
     unsigned _authID;

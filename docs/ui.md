@@ -147,13 +147,4 @@ settings > general > Background picks a photo of the library (a popover on an ip
 ## about screen
 
 settings > About Yozora shows the sticker card, the name and version of the app, a line about it and the rows: GitHub, the Telegram channel, WebKit and the official testers. the WebKit row has no address, its second line is the version of the engine this build was made from (`YozoraWebKitVersion` of `Info.plist`, set from `core/source.json` and kept equal to it by `tests/test_core_source.py`; a missing key shows `?` and is logged). a row with an address opens it, the other two only show their text.
-
-## shortcuts of the home screen
-
-the menu of a page has "add a shortcut to the home screen". ios lets an app put no icon on the home screen, only a configuration profile with a web clip does, and a profile is installed from a download of Safari. `YZWebShortcut` makes an unsigned `.mobileconfig` (one `com.apple.webClip.managed` payload: the title of the page, an icon of 180 points drawn from the favicon on its tile or the first letter of the host on the accent, `FullScreen`, `Precomposed`), the stream proxy serves it on the loopback address as `application/x-apple-aspen-config` (`YZStreamProxy`, `localURLForFiles:`) and `openURL:` hands the address to Safari. a background task keeps the socket for 120 seconds. the person confirms the profile in Settings, the system warns that it is not signed.
-
-the clip opens `yozora-app://open?url=<page>` (a URL type of `Info.plist`). `openWebAppURL:` of the browser shows the page in a popup window of the browser with `_appMode`: no top bar, no bottom bar, the page between the safe areas, one core and no tab list, nothing saved in the tabs. a stroke from the left edge goes back and closes the window when there is no page behind. the menu of that window is not reachable, so a shortcut cannot be made from it.
-
-not tried on a device: whether Safari of each ios takes a profile from the loopback address, and whether the home screen opens an app by a clip of a custom scheme.
-
 the rows of the menu wrap to a second line: the blocker row ("Включить блокировщик на сайте") was cut to "Включить б...ик" on one line.
