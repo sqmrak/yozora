@@ -210,6 +210,12 @@ static UIImage *YZThumbnailFromView(UIView *view) {
 // the address field is a flat pill in the modern design and the rounded field of the system in the classic one
 - (void)styleField {
     [(YZWellView *)_field applyTheme];
+    // the floating pill lifts off the page ground with a soft shadow, the other fields lie flat
+    BOOL floating = [YZTheme isFloatingBar];
+    _field.layer.shadowColor = [[UIColor blackColor] CGColor];
+    _field.layer.shadowOpacity = floating ? ([YZTheme isDark] ? 0.5f : 0.14f) : 0;
+    _field.layer.shadowRadius = 9;
+    _field.layer.shadowOffset = CGSizeMake(0, 3);
 }
 
 - (void)styleCancelButton {
@@ -223,10 +229,17 @@ static UIImage *YZThumbnailFromView(UIView *view) {
     }
 }
 
-// the keys of the bars in the order they stand, the same in every design: pages are no longer kept as bookmarks, so the share key stands
-// where the star was
+// the keys of the bars in the order they stand. the flat design and the floating bar have the share key where the others have the star (the star
+// lives in the menu there), the tabs and the menu close the row in every design but the floating one, which puts the menu before the tabs
 - (NSArray *)barButtons {
-    return [NSArray arrayWithObjects:_backButton, _forwardButton, _shareButton, _tabsButton, _menuButton, nil];
+    // the bar at the top has two keys, as Firefox has: back, forward and share are in its menu
+    if ([self layoutAtTop])
+        return [NSArray arrayWithObjects:_tabsButton, _menuButton, nil];
+    if ([YZTheme isFloatingBar])
+        return [NSArray arrayWithObjects:_backButton, _forwardButton, _shareButton, _menuButton, _tabsButton, nil];
+    if ([YZTheme isFlat])
+        return [NSArray arrayWithObjects:_backButton, _forwardButton, _shareButton, _tabsButton, _menuButton, nil];
+    return [NSArray arrayWithObjects:_backButton, _forwardButton, _starButton, _tabsButton, _menuButton, nil];
 }
 
 - (void)styleBarButton:(UIButton *)button icon:(YZIcon)icon {
@@ -1273,65 +1286,20 @@ static void YZOpenInOtherApp(NSURL *url, BOOL universalOnly, void (^done)(BOOL o
 
 #pragma mark bottom bar
 
-// the bar leaves after a few finger lengths down and returns only at the top, while typing and while anything
-// opens, so a scroll up mid page does not bring it back. the page grows first, so the bar slides over page
-// and never over a hole
-- (void)trackScrollForBars {
-    if (!_core || [self isWide] || _popupMode) {
-        _scrollCore = NULL;
-        return;
-    }
-    int scroll = yozora_core_scroll_y(_core);
-    if (_scrollCore != _core) {
-        // another page, or the same one after a return: no travel is carried over
-        _scrollCore = _core;
-        _lastScrollY = scroll;
-        _scrollTravel = 0;
-        return;
-    }
-    int delta = scroll - _lastScrollY;
-    _lastScrollY = scroll;
-    BOOL busy = _editing || _pageEditing || [self findBarOpen] || !_tabsView.hidden || _menu || _controlSheet || _targetMenu || _filePicker || self.presentedViewController
-        || yozora_core_state(_core) == YOZORA_LOAD_FAILED || [[self currentTab] isBlank];
-    if (busy || scroll <= 8 || delta > 1200 || delta < -1200) {
-        [self setBottomBarShown:YES animated:YES];
-        _scrollTravel = 0;
-        return;
-    }
-    if (!delta)
-        return;
-    // the travel is counted in one direction: a change of direction starts again
-    if ((delta > 0) != (_scrollTravel > 0))
-        _scrollTravel = 0;
-    _scrollTravel += delta;
-    if (_scrollTravel > 56 && scroll > 120)
-        [self setBottomBarShown:NO animated:YES];
-}
-
 - (void)setBottomBarShown:(BOOL)shown animated:(BOOL)animated {
     if (shown == _bottomBarShown || [self isWide])
         return;
     _bottomBarShown = shown;
     _barLeaving = NO;
-    CGFloat away = [self barHeight] + [self chromeInsets].bottom + 6;
+    CGFloat away = [self bottomBlockHeight] + [self chromeInsets].bottom + 6;
     CGAffineTransform gone = CGAffineTransformMakeTranslation(0, away);
     if (!shown) {
         // the bar covers the strip until the core paints a frame of the grown size, unpainted it showed as a
         // white band
         _pageReservesBar = NO;
-        BOOL takesTop = [YZSettings hideBarsOnScroll] && _pageReservesTop && _core;
-        if (takesTop) {
-            // the page grows upward by the address bar, so it scrolls up by as much and the rows stay where
-            // they are on the screen
-            yozora_core_scroll(_core, -(int)[self barHeight]);
-            [_pageView syncScrollOffset];
-            _pageReservesTop = NO;
-        }
         [self layoutChrome];
         if (!animated) {
             _bottomBar.transform = gone;
-            if (takesTop)
-                [self moveTopBarAway:YES animated:NO];
             return;
         }
         _barLeaving = YES;
@@ -1388,7 +1356,7 @@ static void YZOpenInOtherApp(NSURL *url, BOOL universalOnly, void (^done)(BOOL o
 
 - (void)slideBottomBarAway {
     _barLeaving = NO;
-    CGFloat away = [self barHeight] + [self chromeInsets].bottom + 6;
+    CGFloat away = [self bottomBlockHeight] + [self chromeInsets].bottom + 6;
     YZMotionAnimateView(_bottomBar, CGAffineTransformMakeTranslation(0, away), 1, YOZORA_MOTION_DISMISS, 0, nil);
     if (!_pageReservesTop)
         [self moveTopBarAway:YES animated:YES];
@@ -1446,6 +1414,26 @@ static void YZOpenInOtherApp(NSURL *url, BOOL universalOnly, void (^done)(BOOL o
 
 static const CGFloat YZTabStripHeight = 44;
 
+// the floating bar of the modern design stands in one of two places on a phone, a wide screen has its toolbar at the top whatever was chosen
+- (BOOL)layoutAtBottom { return ![self isWide] && [YZTheme barAtBottom]; }
+- (BOOL)layoutAtTop { return ![self isWide] && [YZTheme barAtTop]; }
+
+// the height of what stands at the foot of a phone without the home indicator: the keys, and over them the address row in the bottom layout.
+// nothing in the top layout and on a wide screen
+- (CGFloat)bottomBlockHeight {
+    if ([self isWide] || [self layoutAtTop])
+        return 0;
+    return [self layoutAtBottom] ? 2 * [self barHeight] : [self barHeight];
+}
+
+// where the thin line of the load stands, in the coordinates of the bar that holds it: under the address row
+- (CGFloat)progressY {
+    CGFloat bar = [self barHeight];
+    if ([self layoutAtBottom])
+        return bar - 3;
+    return [self chromeInsets].top + ([self isWide] ? YZTabStripHeight : 0) + bar - 3;
+}
+
 - (CGFloat)barHeight {
     BOOL landscape = self.view.bounds.size.width > self.view.bounds.size.height;
     // the bars of ios 7 are 44 points, 32 on a phone on its side, a little more here to keep the glyphs apart
@@ -1461,10 +1449,10 @@ static const CGFloat YZTabStripHeight = 44;
     if (!_downloadLine)
         return;
     BOOL wide = [self isWide];
-    UIView *host = wide ? _topBar : _bottomBar;
+    UIView *host = (wide || [self layoutAtTop]) ? _topBar : _bottomBar;
     if (_downloadLine.superview != host)
         [host addSubview:_downloadLine];
-    CGFloat y = wide ? [self chromeInsets].top + YZTabStripHeight : 0;
+    CGFloat y = (wide || [self layoutAtTop]) ? [self chromeInsets].top + (wide ? YZTabStripHeight : 0) : 0;
     _downloadLine.frame = CGRectMake(0, y, host.bounds.size.width * MAX((CGFloat)0.04, MIN((CGFloat)1, _downloadShare)), 3);
 }
 
@@ -1510,11 +1498,14 @@ static const CGFloat YZTabStripHeight = 44;
     UIEdgeInsets insets = [self chromeInsets];
     CGFloat top = insets.top, bottom = insets.bottom, inner = width - insets.left - insets.right;
     BOOL wide = [self isWide];
+    BOOL atBottom = [self layoutAtBottom], atTop = [self layoutAtTop];
     CGFloat strip = wide ? YZTabStripHeight : 0;
     CGFloat toolTop = top + strip;
+    // the bottom layout has nothing at the top but the strip under the status line
+    CGFloat topRow = atBottom ? 0 : bar;
     // bounds and center, a frame set under the leaving transform lands in the wrong place
-    _topBar.bounds = CGRectMake(0, 0, width, toolTop + bar);
-    _topBar.center = CGPointMake(width / 2, (toolTop + bar) / 2);
+    _topBar.bounds = CGRectMake(0, 0, width, toolTop + topRow);
+    _topBar.center = CGPointMake(width / 2, (toolTop + topRow) / 2);
     UIView *statusStrip = [_topBar viewWithTag:2];
     statusStrip.bounds = CGRectMake(0, 0, width, top);
     statusStrip.center = CGPointMake(width / 2, top / 2);
@@ -1541,17 +1532,23 @@ static const CGFloat YZTabStripHeight = 44;
     }
     _tabStrip.hidden = !wide;
     _tabStrip.frame = CGRectMake(insets.left, top, inner, strip);
-    // the buttons live in the bottom bar of a phone and in the toolbar of a wide screen
-    UIView *host = wide ? _topBar : _bottomBar;
+    // the buttons live in the bottom bar of a phone, in the toolbar of a wide screen and in the one row of the top layout
+    UIView *host = (wide || atTop) ? _topBar : _bottomBar;
     NSArray *buttons = [self barButtons];
     for (UIButton *button in buttons) {
         if (button.superview != host)
             [host addSubview:button];
     }
-    _bottomBar.hidden = wide;
+    // the address, its cancel key and the line of the load stand with the keys in the bottom layout and in the top bar in every other
+    UIView *addressHost = atBottom ? _bottomBar : _topBar;
+    for (UIView *piece in [NSArray arrayWithObjects:_field, _cancelButton, _progress, nil]) {
+        if (piece.superview != addressHost)
+            [addressHost addSubview:piece];
+    }
+    _bottomBar.hidden = wide || atTop;
     // the address field is the search bar of Material 3: a pill that leaves room for the cancel button while it is edited
     CGFloat cancelWidth = _editing ? 80 : 0;
-    CGFloat fieldHeight = [YZTheme isFlat] ? MIN(bar - 14, (CGFloat)30) : bar - 16;
+    CGFloat fieldHeight = [YZTheme isFlat] ? MIN(bar - 14, (CGFloat)30) : [YZTheme isFloatingBar] ? bar - 10 : bar - 16;
     CGFloat fieldLeft = insets.left + 12, fieldRight = insets.right + 12;
     if (wide) {
         // back and forward left, share, tabs and menu right, cancel takes the right while the address is
@@ -1568,22 +1565,43 @@ static const CGFloat YZTabStripHeight = 44;
         fieldRight = _editing ? insets.right + 12 : insets.right + 8 + 3 * slot + 4;
         _bottomBar.transform = CGAffineTransformIdentity;
         _bottomBar.frame = CGRectMake(0, height, width, 0);
+    } else if (atTop) {
+        // the tabs and the menu close the row on the right, the cancel key takes their place while the address is edited
+        CGFloat slot = 48;
+        for (NSUInteger i = 0; i < [buttons count]; ++i) {
+            UIButton *button = [buttons objectAtIndex:i];
+            button.frame = CGRectMake(width - insets.right - 8 - slot * ([buttons count] - i), toolTop, slot, bar);
+            button.hidden = _editing;
+        }
+        fieldRight = _editing ? insets.right + 12 : insets.right + 8 + [buttons count] * slot + 4;
+        _bottomBar.transform = CGAffineTransformIdentity;
+        _bottomBar.frame = CGRectMake(0, height, width, 0);
     } else {
+        // the keys are the lower row of the bottom layout, under the address. while the address is edited only its row stays, over the keyboard
+        BOOL addressOnly = atBottom && _editing;
         CGFloat slot = inner / [buttons count];
         for (NSUInteger i = 0; i < [buttons count]; ++i) {
-            [[buttons objectAtIndex:i] setFrame:CGRectMake(insets.left + slot * i, 0, slot, bar)];
-            [[buttons objectAtIndex:i] setHidden:NO];
+            [[buttons objectAtIndex:i] setFrame:CGRectMake(insets.left + slot * i, atBottom ? bar : 0, slot, bar)];
+            [[buttons objectAtIndex:i] setHidden:addressOnly];
         }
+        CGFloat rows = atBottom ? (addressOnly ? bar : 2 * bar) : bar;
+        BOOL lifted = addressOnly && _keyboardHeight > 0;
+        CGFloat foot = lifted ? 0 : bottom;
         // bounds and center, a frame set under the leaving transform lands in the wrong place
-        CGRect barFrame = CGRectMake(0, height - bar - bottom, width, bar + bottom);
+        CGRect barFrame = CGRectMake(0, height - rows - foot - (lifted ? _keyboardHeight : 0), width, rows + foot);
         _bottomBar.bounds = CGRectMake(0, 0, barFrame.size.width, barFrame.size.height);
         _bottomBar.center = CGPointMake(CGRectGetMidX(barFrame), CGRectGetMidY(barFrame));
         [_bottomBar viewWithTag:YZBottomSkirtTag].frame = CGRectMake(0, barFrame.size.height, barFrame.size.width, 120);
     }
-    _field.frame = CGRectMake(fieldLeft, toolTop + floor((bar - fieldHeight) / 2), MAX((CGFloat)0, width - fieldLeft - fieldRight - cancelWidth), fieldHeight);
+    CGFloat addressTop = atBottom ? 0 : toolTop;
+    _field.frame = CGRectMake(fieldLeft, addressTop + floor((bar - fieldHeight) / 2), MAX((CGFloat)0, width - fieldLeft - fieldRight - cancelWidth), fieldHeight);
     // the classic well carries its own corners in its picture
     _field.layer.cornerRadius = [YZTheme isClassic] ? 0 : [YZTheme isFlat] ? 8 : fieldHeight / 2;
-    _securityView.frame = CGRectMake(10, 0, 28, fieldHeight);
+    // a shadow without a path is rendered offscreen from the alpha of the layer on every frame, a slow thing on an old phone
+    _field.layer.shadowPath = [YZTheme isFloatingBar]
+        ? [[UIBezierPath bezierPathWithRoundedRect:_field.bounds cornerRadius:fieldHeight / 2] CGPath] : NULL;
+    _securityView.frame = _securityView.contentMode == UIViewContentModeScaleAspectFit ? CGRectMake(14, floor((fieldHeight - 22) / 2), 22, 22)
+                                                                                         : CGRectMake(10, 0, 28, fieldHeight);
     // the classic field is a pill with a round end: the keys in it are a little smaller and stand off the end
     BOOL classicField = [YZTheme isClassic];
     CGFloat key = classicField ? fieldHeight - 6 : fieldHeight;
@@ -1604,14 +1622,14 @@ static const CGFloat YZTabStripHeight = 44;
         inputRight = inputLeft;
     }
     _input.frame = CGRectMake(inputLeft, 0, MAX((CGFloat)0, _field.bounds.size.width - inputLeft - inputRight), fieldHeight);
-    _cancelButton.frame = CGRectMake(width - insets.right - 84, toolTop, 84, bar);
-    _progress.frame = CGRectMake(0, toolTop + bar - 3, width * (_shownProgress / 100.0f), 3);
+    _cancelButton.frame = CGRectMake(width - insets.right - 84, addressTop, 84, bar);
+    _progress.frame = CGRectMake(0, [self progressY], width * (_shownProgress / 100.0f), 3);
     [self layoutDownloadLine];
     // the keyboard of a page field covers the bottom bar and the page ends above it
-    CGFloat reserved = wide ? bottom : (_pageReservesBar ? bar + bottom : 0);
+    CGFloat reserved = wide ? 0 : atTop ? bottom : (_pageReservesBar ? [self bottomBlockHeight] + bottom : 0);
     CGFloat covered = (_pageEditing || [self findBarOpen]) ? MAX(reserved, _keyboardHeight) : reserved;
     // with the address bar gone the page starts under the status strip, which stays
-    CGFloat pageTop = (_pageReservesTop || wide) ? toolTop + bar : top;
+    CGFloat pageTop = atBottom ? top : ((_pageReservesTop || wide) ? toolTop + bar : top);
     // the page stands between the notch insets, the bars keep the full width
     CGRect page = CGRectMake(insets.left, pageTop, MAX((CGFloat)0, inner), MAX((CGFloat)0, height - pageTop - covered));
     _home.frame = page;
@@ -1639,7 +1657,8 @@ static const CGFloat YZTabStripHeight = 44;
         else
             place();
     }
-    CGFloat suggestionsBottom = MAX((CGFloat)0, _keyboardHeight);
+    // the address row of the bottom layout stands over the keyboard, the suggestions end above it
+    CGFloat suggestionsBottom = atBottom && _editing ? (_keyboardHeight > 0 ? _keyboardHeight : bottom) + bar : MAX((CGFloat)0, _keyboardHeight);
     _suggestionsTable.frame = CGRectMake(insets.left, pageTop, MAX((CGFloat)0, inner), MAX((CGFloat)0, height - pageTop - suggestionsBottom));
     if (_findBar) {
         // on a phone the bar covers the strip under the status bar too, on a wide screen the tabs stay visible above it
@@ -1711,6 +1730,13 @@ static const CGFloat YZTabStripHeight = 44;
         else
             shown = url;
     }
+    if ([YZTheme isFloatingBar]) {
+        // the pill shows the host and, lighter, the title of the page after it, as Safari does. the field gets plain text again when it is edited
+        NSString *title = [[self currentTab] title];
+        NSString *tail = [shown length] && ![title isEqualToString:shown] ? title : nil;
+        YZSetAddressText(_input, shown, tail, [YZTheme fieldInkColor], [YZTheme fieldHintColor]);
+        return;
+    }
     if (![_input.text isEqualToString:shown])
         _input.text = shown;
 }
@@ -1749,6 +1775,9 @@ static const CGFloat YZTabStripHeight = 44;
         [previousTitle release];
         if ([title length])
             tab.title = title;
+        // the title is part of the address pill of the floating bar
+        if ([YZTheme isFloatingBar])
+            [self updateAddressDisplay];
     }
     if (forced || (int)state != _shownState || blank != _shownBlank || secure != _shownSecure) {
         _shownState = state;
@@ -1766,6 +1795,17 @@ static const CGFloat YZTabStripHeight = 44;
         // a blank private tab shows the mask of the private session where a blank tab shows the search glass
         _securityView.image = [YZTheme chromeIcon:(blank ? ([YZSettings incognito] ? YZIconIncognito : YZIconSearch) : YZIconLock) size:[YZTheme isFlat] ? 16 : 20
                                       color:(secure || (blank && [YZSettings incognito])) ? [YZTheme fieldAccentColor] : [YZTheme fieldHintColor]];
+        // the floating bar shows the mark of the search engine on a blank page, small, in place of the glass
+        _securityView.contentMode = UIViewContentModeCenter;
+        if (blank && [YZTheme isFloatingBar] && ![YZSettings incognito]) {
+            NSArray *logos = [NSArray arrayWithObjects:@"google", @"duckduckgo", @"yandex", nil];
+            NSUInteger engine = (NSUInteger)[YZSettings searchEngine];
+            UIImage *mark = engine < [logos count] ? [YZTheme logoNamed:[logos objectAtIndex:engine]] : nil;
+            if (mark) {
+                _securityView.image = mark;
+                _securityView.contentMode = UIViewContentModeScaleAspectFit;
+            }
+        }
         _securityView.hidden = !blank && !secure;
         if (state != YOZORA_LOAD_FAILED)
             [self showBanner:nil];
@@ -1793,7 +1833,7 @@ static const CGFloat YZTabStripHeight = 44;
     if (forced || progress != _shownProgress) {
         int previous = _shownProgress;
         _shownProgress = progress;
-        CGFloat full = self.view.bounds.size.width, y = [self chromeInsets].top + ([self isWide] ? YZTabStripHeight : 0) + [self barHeight] - 3;
+        CGFloat full = self.view.bounds.size.width, y = [self progressY];
         if (progress == 0 && previous > 0 && !_progress.hidden) {
             // a finished load runs the bar to the end and lets it fade
             [UIView animateWithDuration:[YZTheme animationsEnabled] ? 0.25 : 0 delay:0
@@ -2556,11 +2596,12 @@ static UIColor *YZColorFromCSS(NSString *text) {
     add(YZMenuSettings, YZT(@"Настройки"), YZIconSettings);
     _menu = [[YZMenuView alloc] initWithFrame:self.view.bounds];
     _menu.delegate = self;
-    // the card stands on the bottom bar, above the menu button at its right end
-    BOOL wide = [self isWide];
-    _menu.anchorsTop = wide;
-    _menu.topInset = [self chromeInsets].top + YZTabStripHeight + [self barHeight] + 4;
-    _menu.bottomInset = wide ? [self chromeInsets].bottom + 4 : [self chromeInsets].bottom + [self barHeight] + 4;
+    // the card stands on the bottom bar, above the menu button at its right end. with the menu button in the top row (a wide screen, the top layout)
+    // it hangs from there
+    BOOL hangs = [self isWide] || [self layoutAtTop];
+    _menu.anchorsTop = hangs;
+    _menu.topInset = [self chromeInsets].top + ([self isWide] ? YZTabStripHeight : 0) + [self barHeight] + 4;
+    _menu.bottomInset = hangs ? [self chromeInsets].bottom + 4 : [self chromeInsets].bottom + [self bottomBlockHeight] + 4;
     _menu.rightInset = MAX((CGFloat)12, [self chromeInsets].right + 12);
     [_menu showItems:items titles:titles icons:icons];
     [self.view addSubview:_menu];
@@ -3114,7 +3155,7 @@ typedef enum {
             break;
         }
     }];
-    menu.bottomInset = [self chromeInsets].bottom + (_bottomBarShown && ![self isWide] ? [self barHeight] : 0);
+    menu.bottomInset = [self chromeInsets].bottom + (_bottomBarShown ? [self bottomBlockHeight] : 0);
     _targetMenu = menu;
     [menu showInView:self.view anchor:touch];
 }

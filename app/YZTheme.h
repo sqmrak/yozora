@@ -59,6 +59,15 @@ typedef enum {
 + (BOOL)isClassic;
 /* the flat design: the white bars of Safari on ios 7 with a gray field and the accent on the glyphs */
 + (BOOL)isFlat;
+/* the floating bar: the bars of the modern design. they take the color of the page ground and the address stands in a white pill that casts a soft
+   shadow */
++ (BOOL)isFloatingBar;
+/* the places of the floating bar on a phone (see YZBarLayout): one bar at the foot with the address over the keys, or one row at the top */
++ (BOOL)barAtBottom;
++ (BOOL)barAtTop;
+/* the bars that have no star key, the flat design and the floating bar: the page is kept and dropped from the menu */
++ (BOOL)barKeepsStarInMenu;
++ (UIColor *)addressFieldColor;
 /* the ground of the start page in the classic design: white linen on the light theme, black linen on the dark ones, a
    tile that repeats. the modern design keeps the flat surface color */
 + (UIColor *)linenColor;

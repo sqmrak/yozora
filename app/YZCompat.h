@@ -68,6 +68,41 @@ static inline void YZSetPlaceholder(UITextField *field, NSString *text, UIColor 
     [field performSelector:setter withObject:string];
 }
 
+/* the text of an address field in two colors: head in the color of the field, tail (a page title after a slash) in the color of a hint. ios 5 has no
+   attributed text in a field and gets the head alone, which is the address and nothing else. the keys are the literal strings of the ios 6 constants,
+   a field that is edited takes plain text again (the caller sets text) */
+static inline void YZSetAddressText(UITextField *field, NSString *head, NSString *tail, UIColor *headColor, UIColor *tailColor) {
+    SEL setter = NSSelectorFromString(@"setAttributedText:");
+    Class attributed = NSClassFromString(@"NSMutableAttributedString");
+    if (![tail length] || !attributed || !field.font || ![field respondsToSelector:setter]) {
+        field.text = head;
+        return;
+    }
+    NSString *text = [NSString stringWithFormat:@"%@ / %@", head, tail];
+    id string = [[[attributed alloc] performSelector:NSSelectorFromString(@"initWithString:") withObject:text] autorelease];
+    NSRange all = NSMakeRange(0, [text length]);
+    NSRange rest = NSMakeRange([head length], [text length] - [head length]);
+    SEL add = NSSelectorFromString(@"addAttribute:value:range:");
+    NSMethodSignature *signature = [string methodSignatureForSelector:add];
+    if (!signature) {
+        field.text = head;
+        return;
+    }
+    void (^apply)(NSString *, id, NSRange) = ^(NSString *key, id value, NSRange range) {
+        NSInvocation *call = [NSInvocation invocationWithMethodSignature:signature];
+        [call setTarget:string];
+        [call setSelector:add];
+        [call setArgument:&key atIndex:2];
+        [call setArgument:&value atIndex:3];
+        [call setArgument:&range atIndex:4];
+        [call invoke];
+    };
+    apply(@"NSFont", field.font, all);
+    apply(@"NSColor", headColor, all);
+    apply(@"NSColor", tailColor, rest);
+    [field performSelector:setter withObject:string];
+}
+
 /* ios 10 with the rotation lock opens a root screen in portrait, so it follows the way the device is held */
 static inline UIInterfaceOrientation YZRootOrientation(void) {
     UIDeviceOrientation held = [[UIDevice currentDevice] orientation];

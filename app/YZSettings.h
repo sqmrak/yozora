@@ -25,6 +25,14 @@ typedef enum {
     YZDesignFlat
 } YZDesign;
 
+/* where the bars of the modern design stand (they are always the floating ones: the address in a white pill over the page ground). bottom: one
+   bar at the foot, the pill over the keys back, forward, share, menu and tabs, nothing at the top. top: no bar at the foot, one row at the top as
+   Firefox has it, the pill and two keys, tabs and menu. the classic and the flat design keep their own bars */
+typedef enum {
+    YZBarLayoutBottom,
+    YZBarLayoutTop
+} YZBarLayout;
+
 /* how the tab tray shows the tabs: a grid of cards that scroll, as Firefox does, or pages that are paged sideways one at a time, as Safari does */
 typedef enum {
     YZTabsLayoutGrid,
@@ -53,6 +61,9 @@ extern NSString *const YZSettingsDidChangeNotification;
 /* the grid in the modern design whatever was chosen: the pages exist in the classic and the flat one */
 + (YZTabsLayout)tabsLayout;
 + (void)setTabsLayout:(YZTabsLayout)layout;
+/* an unset choice is the bar at the bottom */
++ (YZBarLayout)barLayout;
++ (void)setBarLayout:(YZBarLayout)layout;
 + (YZMascot)mascot;
 + (void)setMascot:(YZMascot)mascot;
 + (YZThemeKind)theme;
@@ -81,8 +92,6 @@ extern NSString *const YZSettingsDidChangeNotification;
 + (void)noteHomeBackgroundChanged:(BOOL)present;
 + (BOOL)mascotGlow;
 + (void)setMascotGlow:(BOOL)enabled;
-+ (BOOL)hideBarsOnScroll;
-+ (void)setHideBarsOnScroll:(BOOL)enabled;
 + (void)setReduceMotion:(BOOL)enabled;
 /* fonts that sites send are loaded and drawn */
 + (BOOL)webFonts;

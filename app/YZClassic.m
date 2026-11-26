@@ -252,7 +252,7 @@ static const NSInteger YZLightTag = 90417;
     _rim.hidden = !classic;
     _body.hidden = !classic;
     _gloss.hidden = !classic;
-    self.backgroundColor = classic ? [UIColor clearColor] : [YZTheme fieldColor];
+    self.backgroundColor = classic ? [UIColor clearColor] : [YZTheme addressFieldColor];
     if (!classic)
         return;
     BOOL dark = [YZTheme isDark];

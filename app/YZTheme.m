@@ -80,6 +80,10 @@ static UIColor *YZTint(UIColor *color, BOOL dim) {
 
 + (BOOL)isClassic { return [YZSettings design] == YZDesignClassic; }
 + (BOOL)isFlat { return [YZSettings design] == YZDesignFlat; }
++ (BOOL)isFloatingBar { return [YZSettings design] == YZDesignModern; }
++ (BOOL)barAtBottom { return [self isFloatingBar] && [YZSettings barLayout] == YZBarLayoutBottom; }
++ (BOOL)barAtTop { return [self isFloatingBar] && [YZSettings barLayout] == YZBarLayoutTop; }
++ (BOOL)barKeepsStarInMenu { return [self isFlat] || [self isFloatingBar]; }
 
 + (UIColor *)fieldInkColor {
     if (![self isClassic])
@@ -162,6 +166,9 @@ static UIColor *YZGrey(UIColor *light, UIColor *dark, UIColor *black, UIColor *i
         return YZGrey(YZRGB(0xf9, 0xf9, 0xfb), YZRGB(0x1d, 0x1c, 0x22), YZRGB(0x0a, 0x0a, 0x0c), YZRGB(0x2b, 0x10, 0x48), YES);
     if ([self isClassic])
         return [YZClassic barMidColor];
+    // the floating bars have no ground of their own: the page shows through the gaps around the pill and the keys
+    if ([self isFloatingBar])
+        return [self surfaceColor];
     return YZTint(YZPick(YZRGB(0xf5, 0xf1, 0xfb), YZRGB(0x1b, 0x17, 0x28), YZRGB(0, 0, 0), YZRGB(0x2b, 0x10, 0x48)), YES);
 }
 + (UIColor *)fieldColor {
@@ -170,6 +177,13 @@ static UIColor *YZGrey(UIColor *light, UIColor *dark, UIColor *black, UIColor *i
     if ([self isClassic])
         return YZGrey(YZRGB(0xff, 0xff, 0xff), YZRGB(0x38, 0x3a, 0x40), YZRGB(0x2c, 0x2c, 0x2e), YZRGB(0x3d, 0x1d, 0x66), YES);
     return YZTint(YZPick(YZRGB(0xea, 0xe4, 0xf5), YZRGB(0x2b, 0x27, 0x3e), YZRGB(28, 28, 30), YZRGB(0x3d, 0x1d, 0x66)), YES);
+}
+// the address pill: the floating bar draws it white (lighter than the cards) over the page ground, the other bars use the color of the fields.
+// the switches and the fields of dialogs keep the field color, white would vanish on the light ground
++ (UIColor *)addressFieldColor {
+    if ([self isFloatingBar])
+        return YZTint(YZPick(YZRGB(0xff, 0xff, 0xff), YZRGB(0x2b, 0x27, 0x3e), YZRGB(28, 28, 30), YZRGB(0x3d, 0x1d, 0x66)), YES);
+    return [self fieldColor];
 }
 + (UIColor *)textColor {
     if ([self isFlat])

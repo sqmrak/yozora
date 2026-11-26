@@ -19,10 +19,10 @@ static NSString *const YZJavascriptKey = @"YZJavascript";
 static NSString *const YZBlockThirdPartyCookiesKey = @"YZBlockThirdPartyCookies";
 static NSString *const YZTextZoomKey = @"YZTextZoom";
 static NSString *const YZReduceMotionKey = @"YZReduceMotion";
-static NSString *const YZHideBarsKey = @"YZHideBarsOnScroll";
 static NSString *const YZMascotKey = @"YZMascot";
 static NSString *const YZTabsLayoutKey = @"YZTabsLayout";
 static NSString *const YZDesignKey = @"YZDesign";
+static NSString *const YZBarLayoutKey = @"YZBarLayout";
 static NSString *const YZMascotGlowKey = @"YZMascotGlow";
 static NSString *const YZDnsServerKey = @"YZDnsServer";
 static NSString *const YZHomeBackgroundBlurKey = @"YZHomeBackgroundBlur";
@@ -147,6 +147,11 @@ static NSInteger YZDesignCurrent = -1;
     [self storeInteger:design forKey:YZDesignKey];
 }
 
++ (YZBarLayout)barLayout {
+    return [self integerForKey:YZBarLayoutKey defaultValue:YZBarLayoutBottom] == YZBarLayoutTop ? YZBarLayoutTop : YZBarLayoutBottom;
+}
++ (void)setBarLayout:(YZBarLayout)layout { [self storeInteger:layout forKey:YZBarLayoutKey]; }
+
 // the girl that came with the app until the person picks the fox, a value of a later version counts as the girl
 + (YZMascot)mascot {
     NSInteger stored = [self integerForKey:YZMascotKey defaultValue:YZMascotSan];
@@ -200,8 +205,6 @@ static NSInteger YZDesignCurrent = -1;
 
 // the bottom bar always leaves on a long scroll down, this adds the address bar to it. off until asked for: a
 // page that grows under the finger is not what every person wants
-+ (BOOL)hideBarsOnScroll { return [self boolForKey:YZHideBarsKey defaultValue:NO]; }
-+ (void)setHideBarsOnScroll:(BOOL)enabled { [self storeBool:enabled forKey:YZHideBarsKey]; }
 
 + (NSInteger)homeBackgroundBlur {
     return MIN((NSInteger)100, MAX((NSInteger)0, [self integerForKey:YZHomeBackgroundBlurKey defaultValue:40]));

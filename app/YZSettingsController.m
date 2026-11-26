@@ -39,6 +39,7 @@ typedef enum {
     YZRowLanguage,
     YZRowTheme,
     YZRowDesign,
+    YZRowBarLayout,
     YZRowTabsLayout,
     YZRowMascotGlow,
     YZRowAccent,
@@ -60,7 +61,6 @@ typedef enum {
     YZRowJavascript,
     YZRowEconomy,
     YZRowReduceMotion,
-    YZRowHideBars,
     YZRowWebFonts,
     YZRowDebug,
     YZRowLogging,
@@ -1307,7 +1307,8 @@ static NSArray *YZEngineTints(void) {
 - (NSArray *)generalSection:(NSNumber *(^)(YZRow))row {
     NSMutableArray *section = [NSMutableArray arrayWithObjects:YZT(@"Основные"), row(YZRowLanguage), row(YZRowTheme), nil];
     [section addObject:row(YZRowDesign)];
-    [section addObjectsFromArray:[NSArray arrayWithObjects:row(YZRowAccent), row(YZRowPrivateAccent), row(YZRowMascot), row(YZRowMascotGlow), row(YZRowBackground), row(YZRowSearchEngine), row(YZRowTabsLayout), row(YZRowTextSize), row(YZRowAppIcons), nil]];
+    [section addObject:row(YZRowBarLayout)];
+    [section addObjectsFromArray:[NSArray arrayWithObjects:row(YZRowAccent), row(YZRowPrivateAccent), row(YZRowMascot), row(YZRowMascotGlow), row(YZRowSearchEngine), row(YZRowTabsLayout), row(YZRowTextSize), row(YZRowAppIcons), nil]];
     return section;
 }
 
@@ -1631,6 +1632,7 @@ static NSArray *YZEngineLogos(void) {
     case YZRowLanguage: return YZT(@"Язык");
     case YZRowTheme: return YZT(@"Тема");
     case YZRowDesign: return YZT(@"Оформление");
+    case YZRowBarLayout: return YZT(@"Панели");
     case YZRowTabsLayout: return YZT(@"Вид вкладок");
     case YZRowMascotGlow: return YZT(@"Свечение маскота");
     case YZRowAccent: return YZT(@"Цвет акцента");
@@ -1651,7 +1653,6 @@ static NSArray *YZEngineLogos(void) {
     case YZRowJavascript: return @"JavaScript";
     case YZRowEconomy: return YZT(@"Экономная отрисовка");
     case YZRowReduceMotion: return YZT(@"Меньше анимаций");
-    case YZRowHideBars: return YZT(@"Прятать адресную строку при прокрутке");
     case YZRowWebFonts: return YZT(@"Шрифты сайтов");
     case YZRowDebug: return YZT(@"Отладка");
     case YZRowLogging: return YZT(@"Логирование");
@@ -1674,6 +1675,7 @@ static NSArray *YZEngineLogos(void) {
     case YZRowLanguage: return [self languageName];
     case YZRowTheme: return [self themeName];
     case YZRowDesign: return [self designName];
+    case YZRowBarLayout: return [YZSettings design] != YZDesignModern ? YZT(@"Прежние") : [YZSettings barLayout] == YZBarLayoutTop ? YZT(@"Сверху") : YZT(@"Снизу");
     case YZRowTabsLayout: return [YZSettings tabsLayout] == YZTabsLayoutPages ? YZT(@"Страницы") : YZT(@"Сетка");
     case YZRowAccent: return [self accentName];
     case YZRowPrivateAccent: return [self privateAccentName];
@@ -1694,7 +1696,6 @@ static NSArray *YZEngineLogos(void) {
     }
     case YZRowEconomy: return YZT(@"Страницы рисуются быстрее и мягче");
     case YZRowReduceMotion: return YZT(@"Сайты анимируют меньше и реже");
-    case YZRowHideBars: return YZT(@"Страница занимает весь экран, адрес возвращается наверху страницы");
     case YZRowWebFonts: return YZT(@"Без них страницы грузятся быстрее");
     case YZRowDebug: return YZT(@"Нагрузка, память, трафик и fps в углу экрана");
     case YZRowLogging: return YZT(@"Копить журнал приложения и страниц");
@@ -1713,6 +1714,7 @@ static NSArray *YZEngineLogos(void) {
     case YZRowLanguage: return YZIconLanguage;
     case YZRowTheme: return YZIconPalette;
     case YZRowDesign: return YZIconSwap;
+    case YZRowBarLayout: return YZIconMenu;
     case YZRowTabsLayout: return YZIconTabs;
     case YZRowAccent: return YZIconPalette;
     case YZRowPrivateAccent: return YZIconBrush;
@@ -1733,7 +1735,6 @@ static NSArray *YZEngineLogos(void) {
     case YZRowEconomy: return YZIconSpeed;
     case YZRowMascotGlow: return YZIconBrush;
     case YZRowReduceMotion: return YZIconAnimation;
-    case YZRowHideBars: return YZIconArrowDown;
     case YZRowWebFonts: return YZIconFont;
     case YZRowDebug: return YZIconBugReport;
     case YZRowLogging: return YZIconTerminal;
@@ -1765,7 +1766,6 @@ static NSArray *YZEngineLogos(void) {
     case YZRowEconomy: return [YZSettings economyRaster];
     case YZRowMascotGlow: return [YZSettings mascotGlow];
     case YZRowReduceMotion: return [YZSettings reduceMotion];
-    case YZRowHideBars: return [YZSettings hideBarsOnScroll];
     case YZRowWebFonts: return [YZSettings webFonts];
     case YZRowDebug: return [YZSettings debugOverlay];
     case YZRowLogging: return [YZSettings logging];
@@ -1791,7 +1791,6 @@ static NSArray *YZEngineLogos(void) {
         [_settingsDelegate settingsControllerDidChange:self];
         break;
     case YZRowReduceMotion: [YZSettings setReduceMotion:on]; break;
-    case YZRowHideBars: [YZSettings setHideBarsOnScroll:on]; break;
     case YZRowWebFonts: [YZSettings setWebFonts:on]; break;
     case YZRowDebug:
         [YZSettings setDebugOverlay:on];
@@ -2077,6 +2076,20 @@ static NSArray *YZEngineLogos(void) {
         choice.lockedMessages = [NSArray arrayWithObjects:@"", YZT(@"Классическое оформление поддерживается на iOS с 5 по 7"),
                                  YZT(@"Плоское оформление поддерживается на iOS с 5 по 15"), nil];
         break;
+    case YZRowBarLayout:
+        choice.heading = YZT(@"Панели");
+        choice.titles = [NSArray arrayWithObjects:YZT(@"Снизу"), YZT(@"Сверху"), nil];
+        choice.details = [NSArray arrayWithObjects:YZT(@"Один бар внизу: адрес над кнопками, сверху ничего"),
+                          YZT(@"Одна строка сверху, как в Firefox: адрес, вкладки и меню, внизу ничего"), nil];
+        choice.pictures = nil;
+        choice.tints = nil;
+        choice.bareMarks = NO;
+        choice.selected = [YZSettings barLayout];
+        BOOL notModern = [YZSettings design] != YZDesignModern;
+        choice.locked = [NSArray arrayWithObjects:[NSNumber numberWithBool:notModern], [NSNumber numberWithBool:notModern], nil];
+        choice.lockedMessages = [NSArray arrayWithObjects:YZT(@"Расположение панелей выбирается только в современном оформлении"),
+                                 YZT(@"Расположение панелей выбирается только в современном оформлении"), nil];
+        break;
     case YZRowTabsLayout:
         choice.heading = YZT(@"Вид вкладок");
         choice.titles = [NSArray arrayWithObjects:YZT(@"Сетка"), YZT(@"Страницы"), nil];
@@ -2119,6 +2132,7 @@ static NSArray *YZEngineLogos(void) {
         case YZRowLanguage: [YZSettings setLanguage:(YZLanguage)index]; break;
         case YZRowTheme: [YZSettings setTheme:(YZThemeKind)index]; break;
         case YZRowDesign: [YZSettings setDesign:(YZDesign)index]; break;
+        case YZRowBarLayout: [YZSettings setBarLayout:(YZBarLayout)index]; break;
         case YZRowTabsLayout: [YZSettings setTabsLayout:(YZTabsLayout)index]; break;
         case YZRowMascot: [YZSettings setMascot:(YZMascot)index]; break;
         case YZRowSearchEngine: [YZSettings setSearchEngine:(yozora_search_engine)index]; break;
@@ -2144,6 +2158,7 @@ static NSArray *YZEngineLogos(void) {
     case YZRowLanguage:
     case YZRowTheme:
     case YZRowDesign:
+    case YZRowBarLayout:
     case YZRowTabsLayout:
     case YZRowMascot:
     case YZRowSearchEngine:
