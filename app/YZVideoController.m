@@ -205,6 +205,8 @@ static UILabel *YZToastLabel(void) {
 
     _bottom = [[UIView alloc] init];
     _seek = [[YZWaveSeekBar alloc] init];
+    // an ordinary bar: the wave that travelled over the picture is gone, the played line and a round handle remain
+    _seek.plain = YES;
     _seek.playedColor = YZPlayerAccent();
     _seek.enabled = NO;
     _seek.accessibilityLabel = YZT(@"Перемотка");

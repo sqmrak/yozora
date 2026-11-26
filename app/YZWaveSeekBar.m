@@ -39,6 +39,7 @@ static UIBezierPath *YZWaveLine(CGFloat width, CGFloat amplitude, CGFloat mid) {
 @synthesize value = _value;
 @synthesize buffered = _buffered;
 @synthesize waving = _waving;
+@synthesize plain = _plain;
 @synthesize dragging = _dragging;
 
 - (id)initWithFrame:(CGRect)frame {
@@ -109,6 +110,27 @@ static UIBezierPath *YZWaveLine(CGFloat width, CGFloat amplitude, CGFloat mid) {
     [CATransaction commit];
 }
 
+// the handle: a thin pill that thins further under a finger, or in the plain bar a circle that grows
+- (CGSize)thumbSizeSqueezed:(BOOL)squeezed {
+    if (_plain)
+        return squeezed ? CGSizeMake(22, 22) : CGSizeMake(16, 16);
+    return CGSizeMake(squeezed ? 2 : 4, THUMB_HEIGHT);
+}
+
+// the plain bar has no gap, the played line runs up to the handle
+- (CGFloat)handleGap { return _plain ? 0 : WAVE_GAP; }
+
+- (void)setPlain:(BOOL)plain {
+    if (plain == _plain)
+        return;
+    _plain = plain;
+    _waving = NO;
+    [_wave removeAllAnimations];
+    _thumb.cornerRadius = plain ? 8 : 2;
+    _laidSize = CGSizeZero;
+    [self setNeedsLayout];
+}
+
 - (CGFloat)trackWidth { return MAX((CGFloat)1, self.bounds.size.width - YZWaveSeekBarInset * 2); }
 
 // a view that is off screen or a system that asks for reduced motion gets the wave standing still
@@ -140,7 +162,8 @@ static UIBezierPath *YZWaveLine(CGFloat width, CGFloat amplitude, CGFloat mid) {
     _wave.bounds = CGRectMake(0, 0, track + WAVE_PERIOD, YZWaveSeekBarHeight);
     _wave.position = CGPointMake(YZWaveSeekBarInset, mid);
     _wave.path = [self wavePath].CGPath;
-    _thumb.bounds = CGRectMake(0, 0, 4, THUMB_HEIGHT);
+    _thumb.bounds = CGRectMake(0, 0, [self thumbSizeSqueezed:_dragging].width, [self thumbSizeSqueezed:_dragging].height);
+    _thumb.cornerRadius = _plain ? [self thumbSizeSqueezed:_dragging].width / 2 : 2;
     [CATransaction commit];
     [self placeGliding:NO];
     [self syncMotion];
@@ -150,8 +173,8 @@ static UIBezierPath *YZWaveLine(CGFloat width, CGFloat amplitude, CGFloat mid) {
 - (void)placeGliding:(BOOL)gliding {
     CGFloat track = [self trackWidth];
     CGFloat played = _value * track;
-    CGFloat waveEnd = played - WAVE_GAP;
-    CGFloat start = MIN((CGFloat)1, MAX((CGFloat)0, (played + WAVE_GAP) / track));
+    CGFloat waveEnd = played - [self handleGap];
+    CGFloat start = MIN((CGFloat)1, MAX((CGFloat)0, (played + [self handleGap]) / track));
     [CATransaction begin];
     if (gliding && [YZTheme animationsEnabled]) {
         [CATransaction setAnimationDuration:0.25];
@@ -225,7 +248,7 @@ static UIBezierPath *YZWaveLine(CGFloat width, CGFloat amplitude, CGFloat mid) {
 
 // the wave flattens into the line and rises again on the spring
 - (void)setWaving:(BOOL)waving {
-    if (waving == _waving)
+    if (_plain || waving == _waving)
         return;
     _waving = waving;
     if (_laidSize.width < 1)
@@ -281,7 +304,10 @@ static UIBezierPath *YZWaveLine(CGFloat width, CGFloat amplitude, CGFloat mid) {
         [CATransaction setAnimationDuration:0.25];
         [CATransaction setAnimationTimingFunction:YZWaveSpring()];
     }
-    _thumb.bounds = CGRectMake(0, 0, squeezed ? 2 : 4, THUMB_HEIGHT);
+    CGSize size = [self thumbSizeSqueezed:squeezed];
+    _thumb.bounds = CGRectMake(0, 0, size.width, size.height);
+    if (_plain)
+        _thumb.cornerRadius = size.width / 2;
     [CATransaction commit];
 }
 

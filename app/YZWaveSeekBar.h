@@ -18,6 +18,7 @@
     float _value;
     float _buffered;
     BOOL _waving;
+    BOOL _plain;
     BOOL _dragging;
     CGSize _laidSize;
     BOOL _observing;
@@ -26,6 +27,9 @@
 @property (nonatomic, assign) float value;
 @property (nonatomic, assign) float buffered;
 @property (nonatomic, assign) BOOL waving;
+/* an ordinary bar: a straight line, a round handle that grows under a finger, no wave and nothing that travels. waving is ignored. set once, before the
+   bar is laid out */
+@property (nonatomic, assign) BOOL plain;
 @property (nonatomic, readonly, getter=isDragging) BOOL dragging;
 /* the colors of the wave and handle, of the loaded line and of the rest */
 @property (nonatomic, copy) UIColor *playedColor;
