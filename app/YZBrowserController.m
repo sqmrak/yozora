@@ -3094,8 +3094,35 @@ typedef enum {
 }
 
 // a blank tab is reused, a full tray refuses with its own message, a private one switches the session first
+// the address goes to a tab behind the page that is open: the page stays under the finger and more links of it can be held the same way. the tab has
+// no core until it is chosen, then createCore loads its address. a private tab changes the session, which shows another set of tabs, so it opens
+// in front as before
+- (void)openURLInBackgroundTab:(NSString *)url {
+    char address[YOZORA_URL_CAP], host[256];
+    if (yozora_address_resolve([url UTF8String], [YZSettings searchEngine], address, sizeof address) != YOZORA_ADDRESS_URL) {
+        [self showError:YZT(@"Этот адрес не поддерживается")];
+        return;
+    }
+    if ([_tabs count] >= YZTabLimit) {
+        [self showError:YZT(@"Открыто слишком много вкладок")];
+        return;
+    }
+    YZTab *tab = [[[YZTab alloc] init] autorelease];
+    tab.url = [NSString stringWithUTF8String:address];
+    tab.title = yozora_address_host(address, host, sizeof host) ? [NSString stringWithUTF8String:host] : tab.url;
+    tab.isPrivate = [YZSettings incognito];
+    [_tabs addObject:tab];
+    [self saveTabs];
+    [self updateChromeForced:YES];
+    [self showTransientBanner:YZT(@"Открыто в новой вкладке")];
+}
+
 - (void)openURLInNewTab:(NSString *)url private:(BOOL)private {
-    if (private && ![YZSettings incognito]) {
+    if (!private) {
+        [self openURLInBackgroundTab:url];
+        return;
+    }
+    if (![YZSettings incognito]) {
         [self setIncognito:YES];
         if (![YZSettings incognito])
             return;
