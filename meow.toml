@@ -206,6 +206,8 @@ slices = ["armv7"]
 min_ios = "5.0"
 signed = true
 allow_dylibs = ["/usr/lib/", "/System/Library/"]
+# AVFAudio exists from ios 14 only, dyld refuses the app at launch on ios 10 and 13 when it is a hard dependency
+forbid_dylibs = ["/System/Library/Frameworks/AVFAudio.framework/"]
 needs = ["app-armv7", "symbols-armv7"]
 
 [verify.release-arm64]
@@ -214,6 +216,8 @@ slices = ["arm64"]
 min_ios = "5.0"
 signed = true
 allow_dylibs = ["/usr/lib/", "/System/Library/"]
+# AVFAudio exists from ios 14 only, dyld refuses the app at launch on ios 10 and 13 when it is a hard dependency
+forbid_dylibs = ["/System/Library/Frameworks/AVFAudio.framework/"]
 needs = ["app-arm64", "symbols-arm64"]
 
 [verify.release-universal]
@@ -222,6 +226,8 @@ slices = ["armv7", "arm64"]
 min_ios = "5.0"
 signed = true
 allow_dylibs = ["/usr/lib/", "/System/Library/"]
+# AVFAudio exists from ios 14 only, dyld refuses the app at launch on ios 10 and 13 when it is a hard dependency
+forbid_dylibs = ["/System/Library/Frameworks/AVFAudio.framework/"]
 needs = ["app-fat"]
 
 # the packages: one ipa per slice, and one with both slices
