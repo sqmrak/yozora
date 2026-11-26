@@ -43,6 +43,8 @@ typedef struct {
     int regexp;
     /* 1 when the dfg tier compiles on a thread of its own, 0 when it compiles on the thread that runs the script (the default on armv7) */
     int concurrent;
+    /* 1 when the optimizing compiler may run (arm64 phones with 1.7 GB or more), 0 when it is not built or the memory is short */
+    int ftl;
     /* the jit executable memory: bytes committed to compiled code and the pool size (0 when the jit is not
        running). a pool that fills leaves the rest of the functions in the interpreter, silently */
     unsigned long long pool_used;

@@ -19,7 +19,7 @@ def load_script(name):
 
 
 # the order the build applies them in: each group starts from the files the one before left
-CHAIN = ("webkit-ios", "webkit-yozora", "webkit-yozora-ios", "webkit-yozora-dns", "webkit-yozora-gcm")
+CHAIN = ("webkit-ios", "webkit-yozora", "webkit-yozora-ios", "webkit-yozora-dns", "webkit-yozora-gcm", "webkit-yozora-jit", "webkit-yozora-metal")
 
 
 def main():

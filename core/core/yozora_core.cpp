@@ -163,17 +163,15 @@ extern "C" void yozora_device_info(yozora_device* device)
     device->memory_mb = static_cast<unsigned>(memory / (1024 * 1024));
 }
 
-// the phones go from 128 MB and one core (iPhone 3GS) to 2 GB and more: caches and the reach of tiles follow the memory
-enum class MemoryTier { Small, Constrained, Medium, Large };
-static MemoryTier memory_tier()
+// the phones go from 128 MB and one core (iPhone 3GS) to 6 GB and more: caches, the growth of the script heap, the optimizing compiler and the reach of
+// tiles follow the memory (the table is core/yozora_budget.c)
+static yozora_memory_limits memory_limits()
 {
     yozora_device device;
     yozora_device_info(&device);
-    if (device.memory_mb < 400)
-        return MemoryTier::Small;
-    if (device.memory_mb <= 512)
-        return MemoryTier::Constrained;
-    return device.memory_mb < 900 ? MemoryTier::Medium : MemoryTier::Large;
+    yozora_memory_limits limits;
+    yozora_memory_limits_for(device.memory_mb, &limits);
+    return limits;
 }
 
 static unsigned device_cores()
@@ -229,6 +227,9 @@ extern "C" void yozora_jit_info_read(yozora_jit_info* info)
 #endif
     info->regexp = info->active && JSC::Options::useRegExpJIT() ? 1 : 0;
     info->concurrent = info->active && JSC::Options::useConcurrentJIT() ? 1 : 0;
+#if ENABLE(FTL_JIT)
+    info->ftl = info->active && info->dfg && JSC::Options::useFTLJIT() ? 1 : 0;
+#endif
     if (info->active) {
         info->pool_used = JSC::ExecutableAllocator::committedByteCount();
         // the size ExecutableAllocator.cpp reserves for this cpu when the option is not set (jump islands are on for thumb2 and arm64)
@@ -251,9 +252,9 @@ static void initialize_javascript_on_core()
     // without a jit the vm runs in mini mode: every collection is full and the heap may grow only 20% over
     // live size, so a page with 20 to 30 MB of live script data collects every 5 MB of allocation (43
     // collections where 1.5 needs 21 in tests/js/gc-churn.html)
-    auto tier = memory_tier();
-    JSC::initialize([tier] {
-        JSC::Options::miniVMHeapGrowthFactor() = tier == MemoryTier::Small ? 1.3 : (tier == MemoryTier::Large ? 1.8 : 1.5);
+    auto limits = memory_limits();
+    JSC::initialize([limits] {
+        JSC::Options::miniVMHeapGrowthFactor() = limits.heap_growth_percent / 100.0;
 #if ENABLE(JIT)
         // the jit is off by default on 32-bit. a phone that refuses the executable mapping makes
         // JavaScriptCore switch it off while the allocator starts, so nothing is probed here: ios allows one
@@ -268,6 +269,11 @@ static void initialize_javascript_on_core()
 #endif
         // the regexp jit passes the script tests on the armv7 baseline build and runs regexps 5 times faster
         JSC::Options::useRegExpJIT() = jit;
+#if ENABLE(FTL_JIT)
+        // the optimizing compiler needs memory and time that a small phone has not got, JSC_useFTLJIT in the environment still decides when it is set
+        if (!std::getenv("JSC_useFTLJIT"))
+            JSC::Options::useFTLJIT() = jit && limits.ftl;
+#endif
 #if CPU(ARM_THUMB2)
         // two armv7 crashes of 1.3.0 on an iPad 4 (ios 10.3.3) ended in generated code: one read at 0x64 inside optimized code, one jumped to the
         // first byte of a page that was not executable, both from a call out of the interpreter into a function. the dfg compiler thread and the
@@ -302,7 +308,7 @@ static bool initialize_process(const char* fonts, const char* roots, char* error
     }
     if (!initializeYozoraFonts(fonts, error, capacity))
         return false;
-    auto tier = memory_tier();
+    auto limits = memory_limits();
     initialize_javascript_on_core();
     WTF::initializeMainThread();
     // the termination exception that ends a script is created together with the watchdog, which has no time limit here
@@ -314,15 +320,15 @@ static bool initialize_process(const char* fonts, const char* roots, char* error
     }
     YozoraCoreThread::attachRunLoop();
     // phones with 512 MB share the smaller cache budget, their live DOM and script heaps need the remaining memory
-    size_t bytecode_pending = tier <= MemoryTier::Constrained ? 6 : (tier == MemoryTier::Medium ? 12 : 24);
+    size_t bytecode_pending = limits.bytecode_pending_mb;
     if (!bytecode_cache_directory().empty() && !YozoraBytecodeCache::open(String::fromUTF8(bytecode_cache_directory()), bytecode_cache_limit(), bytecode_pending * 1024 * 1024))
         std::fprintf(stderr, "yozora: bytecode cache is off\n");
     installYozoraPlatformStrategies();
     ProcessWarming::prewarmGlobally();
     // decoded images share the process budget with scenes and the script heap
-    size_t cache_mb = tier <= MemoryTier::Constrained ? 8 : (tier == MemoryTier::Medium ? 16 : 48);
+    size_t cache_mb = limits.resource_cache_mb;
     MemoryCache::singleton().setCapacities(0, cache_mb * 1024 * 1024 / 2, cache_mb * 1024 * 1024);
-    SkGraphics::SetFontCacheLimit(tier <= MemoryTier::Constrained ? 1024 * 1024 : (tier == MemoryTier::Medium ? 2 * 1024 * 1024 : 4 * 1024 * 1024));
+    SkGraphics::SetFontCacheLimit(static_cast<size_t>(limits.font_cache_kb) * 1024);
     CurlContext::singleton().sslHandle().setCACertPath(String::fromUTF8(roots));
     yozora_translate_set_roots(roots);
     yozora_media_install();

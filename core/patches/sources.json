@@ -715,5 +715,27 @@
       "before": "f5ef5ba92184909c96e5d08110e0fc7462c07dccc9b260d72189b7cd8f941982",
       "after": "55213b8766310ac6fd409c20361d1d8db3ad023f4cd4cc51336ab7ad556f3507"
     }
+  ],
+  "webkit-yozora-jit": [
+    {
+      "path": "Source/WTF/wtf/PlatformHave.h",
+      "before": "408ca38ec7160b785fb9020189d4e909aa539c550a0f53fbd3eaf7ab221909fb",
+      "after": "ac79738b9a4624e7244d0545790094fdb09c33fa3354ceff1f082fb837f79272"
+    },
+    {
+      "path": "Source/WTF/wtf/PlatformEnable.h",
+      "before": "656df5aefdb59d25be6eecaceab17bb0d58be84d76a30d40bf90ec6934fde36c",
+      "after": "2d45da8d446a214b31c941bf6872e8d7e4d8c78d92e1b8fe5162cbc99b5f0ce4"
+    },
+    {
+      "path": "Source/WTF/wtf/posix/OSAllocatorPOSIX.cpp",
+      "before": "fa30c4780ed2e69c6969abffcb863325dbd6d415869507831813d110b33aa027",
+      "after": "aae7a541b806ae7b5dfaa1d9ba2c1c831100c4a70534e5775398bfa3d0ceeb82"
+    },
+    {
+      "path": "Source/JavaScriptCore/jit/ExecutableAllocator.cpp",
+      "before": "6f242db973bc241f76506b36118b5e28473549db52ba0f1612a38f844355f304",
+      "after": "5cebabd43a5622ea26f9d2c7df1a7d126abc351a8b769a5f3af697b14debbda7"
+    }
   ]
 }

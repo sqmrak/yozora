@@ -308,8 +308,8 @@ int main(int argc, char **argv) {
     // what the engine runs, so a crash record that ends in generated code says which tiers could have made it
     yozora_jit_info jit;
     yozora_jit_info_read(&jit);
-    [YZCrash note:[NSString stringWithFormat:@"jit: %s baseline %d dfg %d regexp %d concurrent %d pool %llu of %llu",
-                   jit.compiled ? "built" : "not built", jit.active, jit.dfg, jit.regexp, jit.concurrent, jit.pool_used, jit.pool_size]];
+    [YZCrash note:[NSString stringWithFormat:@"jit: %s baseline %d dfg %d ftl %d regexp %d concurrent %d pool %llu of %llu",
+                   jit.compiled ? "built" : "not built", jit.active, jit.dfg, jit.ftl, jit.regexp, jit.concurrent, jit.pool_used, jit.pool_size]];
     int result = UIApplicationMain(argc, argv, nil, NSStringFromClass([YZAppDelegate class]));
     [pool drain];
     return result;

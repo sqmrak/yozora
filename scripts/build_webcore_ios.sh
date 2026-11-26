@@ -28,12 +28,14 @@ esac
 # keeps the value it was configured with, so a switch needs its own YOZORA_WEBCORE_IOS_BUILD (the webgl trees
 # are build/core/webcore-ios-jit-gl)
 yozora_webgl="${YOZORA_WEBGL:-ON}"
-yozora_wasm="${YOZORA_WASM:-OFF}"
+# empty: the slice decides (arm64 uses the webassembly of javascriptcore, which the optimizing compiler needs, armv7 has an engine of its own)
+yozora_wasm_choice="${YOZORA_WASM:-}"
 [[ "${yozora_webgl}" == ON || "${yozora_webgl}" == OFF ]] || { echo 'yozora: YOZORA_WEBGL must be ON or OFF' >&2; exit 1; }
-[[ "${yozora_wasm}" == ON || "${yozora_wasm}" == OFF ]] || { echo 'yozora: YOZORA_WASM must be ON or OFF' >&2; exit 1; }
+[[ -z "${yozora_wasm_choice}" || "${yozora_wasm_choice}" == ON || "${yozora_wasm_choice}" == OFF ]] || { echo 'yozora: YOZORA_WASM must be ON or OFF' >&2; exit 1; }
 yozora_build="${YOZORA_WEBCORE_IOS_BUILD:-${yozora_default_build}}"
 yozora_version="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["directory"])' "${yozora_root}/core/source.json")"
 yozora_source="${YOZORA_WEBKIT_SRC:-${YOZORA_CORE_SOURCES:-${yozora_root}/build/sources}/${yozora_version}}"
+yozora_llvm="${YOZORA_LLVM_SRC:-${YOZORA_CORE_SOURCES:-${yozora_root}/build/sources}/llvm-project-23.1.1}"
 yozora_jobs="${YOZORA_CORE_JOBS:-2}"
 [[ "${yozora_jobs}" =~ ^[1-8]$ ]] || { echo 'yozora: YOZORA_CORE_JOBS must be between 1 and 8' >&2; exit 1; }
 export YOZORA_TC="${YOZORA_TC:?run through meow, which sets YOZORA_TC}"
@@ -51,7 +53,7 @@ yozora_gperf="${YOZORA_GPERF:-${YOZORA_CORE_TOOLS:-${yozora_deps}/host/tools}/bi
 [[ -x "${yozora_gperf}" ]] || { echo 'yozora: build host gperf with meow build core-tools' >&2; exit 1; }
 python3 -B "${yozora_root}/scripts/fetch_darwin_sources.py"
 python3 -B "${yozora_root}/scripts/fetch_network_sources.py"
-for yozora_patch in webkit-ios webkit-yozora webkit-yozora-ios webkit-yozora-dns webkit-yozora-gcm; do
+for yozora_patch in webkit-ios webkit-yozora webkit-yozora-ios webkit-yozora-dns webkit-yozora-gcm webkit-yozora-jit webkit-yozora-metal; do
     python3 -B "${yozora_root}/scripts/apply_core_patches.py" "${yozora_source}" "${yozora_patch}"
 done
 # YOZORA_SLICES limits the build to one slice, the universal archives need both
@@ -78,14 +80,25 @@ for YOZORA_SLICE in ${yozora_slices}; do
     export PKG_CONFIG_PATH=""
     export PKG_CONFIG_LIBDIR="${yozora_prefix}/lib/pkgconfig:${yozora_icu}/lib/pkgconfig:${yozora_text}/${YOZORA_SLICE}/text/lib/pkgconfig"
     yozora_flags="-B \"${YOZORA_TC}\" -mlinker-version=253 -nostdinc++ -isystem \"${yozora_runtime}/include/c++/v1\" -nostdlib++ -faligned-allocation -DYOZORA_DARWIN=1 -I\"${yozora_root}/core/darwin\""
-    # both slices compile baseline and DFG, YOZORA_ARMV7_JIT=0 keeps the armv7 c-loop. FTL needs more
-    # compilation memory than these phones have to spare
+    # both slices compile baseline and DFG, YOZORA_ARMV7_JIT=0 keeps the armv7 c-loop. FTL is built for arm64 only (it does not exist on
+    # 32 bit) and the core allows it at run time on phones with 1.7 GB of memory or more, see yozora_memory_limits_for
     yozora_js_options="-DENABLE_C_LOOP=${yozora_cloop} -DENABLE_JIT=OFF"
     if [[ "${YOZORA_SLICE}" == armv7 && "${yozora_armv7_jit}" == 1 ]]; then
         yozora_js_options="-DENABLE_C_LOOP=OFF -DENABLE_JIT=ON -DENABLE_DFG_JIT=ON -DENABLE_FTL_JIT=OFF"
     fi
+    if [[ -n "${yozora_wasm_choice}" ]]; then
+        yozora_wasm="${yozora_wasm_choice}"
+    elif [[ "${YOZORA_SLICE}" == arm64 ]]; then
+        yozora_wasm=ON
+    else
+        yozora_wasm=OFF
+    fi
     if [[ "${YOZORA_SLICE}" == arm64 ]]; then
-        yozora_js_options="-DENABLE_C_LOOP=OFF -DENABLE_JIT=ON -DENABLE_DFG_JIT=ON -DENABLE_FTL_JIT=OFF"
+        yozora_js_options="-DENABLE_C_LOOP=OFF -DENABLE_JIT=ON -DENABLE_DFG_JIT=ON -DENABLE_FTL_JIT=ON"
+        # the optimizing compiler (B3) is written together with the webassembly jits and does not build without them, and they are on with it
+        if [[ "${yozora_wasm}" == ON ]]; then
+            yozora_js_options="${yozora_js_options} -DENABLE_WEBASSEMBLY_BBQJIT=ON -DENABLE_WEBASSEMBLY_OMGJIT=ON"
+        fi
         yozora_flags="${yozora_flags} -mcpu=apple-a7"
     fi
     # a cmake tree keeps the absolute path it was configured under and cannot be moved: after the project moved, cmake fails or a new tree
@@ -111,7 +124,7 @@ for YOZORA_SLICE in ${yozora_slices}; do
         -DCMAKE_CXX_FLAGS="${yozora_flags}" \
         -DCMAKE_CXX_STANDARD_LIBRARIES="\"${yozora_runtime}/lib/libc++.a\" \"${yozora_runtime}/lib/libc++abi.a\"" \
         -DCMAKE_PROJECT_INCLUDE="${yozora_root}/core/WebCoreIOSProbe.cmake" \
-        -DYOZORA_DARWIN_ROOT="${yozora_root}/core/darwin" -DYOZORA_WEBCORE_ROOT="${yozora_root}/core/webcore" \
+        -DYOZORA_LLVM_SRC="${yozora_llvm}" -DYOZORA_DARWIN_ROOT="${yozora_root}/core/darwin" -DYOZORA_WEBCORE_ROOT="${yozora_root}/core/webcore" \
         -DYOZORA_ICU_ROOT="${yozora_icu}" -DRuby_EXECUTABLE="${yozora_ruby}" -DGPERF_EXECUTABLE="${yozora_gperf}" \
         -DCMAKE_PREFIX_PATH="${yozora_prefix};${yozora_text}/${YOZORA_SLICE}/text;${yozora_icu}" \
         -DOPENSSL_USE_STATIC_LIBS=ON -DOPENSSL_ROOT_DIR="${yozora_prefix}" \

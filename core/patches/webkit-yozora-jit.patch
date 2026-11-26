@@ -1,0 +1,79 @@
+--- a/Source/WTF/wtf/PlatformHave.h
++++ b/Source/WTF/wtf/PlatformHave.h
+@@ -85,7 +85,7 @@
+ #define HAVE_AUDIT_TOKEN 1
+ #endif
+ 
+-#if PLATFORM(COCOA)
++#if PLATFORM(COCOA) || (PLATFORM(YOZORA) && OS(DARWIN) && CPU(ARM64))
+ #define HAVE_REMAP_JIT 1
+ #endif
+ 
+--- a/Source/WTF/wtf/PlatformEnable.h
++++ b/Source/WTF/wtf/PlatformEnable.h
+@@ -535,6 +535,11 @@
+ #endif
+ #endif
+ 
++// a jailbroken phone does not give a process the right to a MAP_JIT region, but lets it map the same pages twice, one view writable and one executable
++#if !defined(ENABLE_SEPARATED_WX_HEAP) && PLATFORM(YOZORA) && OS(DARWIN) && CPU(ARM64)
++#define ENABLE_SEPARATED_WX_HEAP 1
++#endif
++
+ #if !defined(ENABLE_SEPARATED_WX_HEAP)
+ #define ENABLE_SEPARATED_WX_HEAP 0
+ #endif
+--- a/Source/WTF/wtf/posix/OSAllocatorPOSIX.cpp
++++ b/Source/WTF/wtf/posix/OSAllocatorPOSIX.cpp
+@@ -111,6 +111,14 @@
+         bytes = bytes + 2 * guardSize;
+     }
+     auto result = MmapSpan<uint8_t>::mmap(address, bytes, protection, flags, fd);
++#if OS(DARWIN) && PLATFORM(YOZORA) && CPU(ARM64)
++    // a process without the jit right of the kernel gets EINVAL for MAP_JIT. the executable pool is then an ordinary mapping, and the separated
++    // heaps of the executable allocator make its executable view and its writable view
++    if (!result && executable && (flags & MAP_EXECUTABLE_FOR_JIT)) {
++        flags &= ~MAP_EXECUTABLE_FOR_JIT;
++        result = MmapSpan<uint8_t>::mmap(address, bytes, protection, flags, fd);
++    }
++#endif
+     if (!result)
+         return result.leakSpan().data();
+ 
+--- a/Source/JavaScriptCore/jit/ExecutableAllocator.cpp
++++ b/Source/JavaScriptCore/jit/ExecutableAllocator.cpp
+@@ -330,11 +330,21 @@
+     // Prevent reading the write thunk code.
+     result = vm_protect(mach_task_self(), reinterpret_cast<vm_address_t>(stubBase), stubSize, true, VM_PROT_EXECUTE);
+     RELEASE_ASSERT(!result);
++#if PLATFORM(YOZORA)
++    // the stub page of a pool that is not a MAP_JIT region was writable only, lowering the maximum did not give it the execute right
++    result = vm_protect(mach_task_self(), reinterpret_cast<vm_address_t>(stubBase), stubSize, false, VM_PROT_EXECUTE);
++    RELEASE_ASSERT(!result);
++#endif
+ #endif
+ 
+     // Prevent writing into the executable JIT mapping.
+     result = vm_protect(mach_task_self(), reinterpret_cast<vm_address_t>(jitBase), jitSize, true, VM_PROT_READ | VM_PROT_EXECUTE);
+     RELEASE_ASSERT(!result);
++#if PLATFORM(YOZORA)
++    // a pool that is not a MAP_JIT region is writable, not executable, and lowering the maximum took the write right but gave no execute right
++    result = vm_protect(mach_task_self(), reinterpret_cast<vm_address_t>(jitBase), jitSize, false, VM_PROT_READ | VM_PROT_EXECUTE);
++    RELEASE_ASSERT(!result);
++#endif
+ 
+     // Prevent execution in the writable JIT mapping.
+     result = vm_protect(mach_task_self(), static_cast<vm_address_t>(writableAddr), jitSize, true, VM_PROT_READ | VM_PROT_WRITE);
+@@ -342,7 +352,12 @@
+ 
+ WTF_ALLOW_UNSAFE_BUFFER_USAGE_BEGIN
+     // Zero out writableAddr to avoid leaking the address of the writable mapping.
++#if PLATFORM(YOZORA)
++    // the sdk of this port has no memset_s, a volatile store is not dropped by the compiler either
++    *static_cast<volatile mach_vm_address_t*>(&writableAddr) = 0;
++#else
+     memset_s(&writableAddr, sizeof(writableAddr), 0, sizeof(writableAddr));
++#endif
+ WTF_ALLOW_UNSAFE_BUFFER_USAGE_END
+ 
+ #if ENABLE(SEPARATED_WX_HEAP)

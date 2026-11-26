@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-GROUPS = ["webkit-ios", "webkit-yozora", "webkit-yozora-ios", "webkit-yozora-dns", "webkit-yozora-gcm"]
+GROUPS = ["webkit-ios", "webkit-yozora", "webkit-yozora-ios", "webkit-yozora-dns", "webkit-yozora-gcm", "webkit-yozora-jit", "webkit-yozora-metal"]
 
 
 def digest(path):
