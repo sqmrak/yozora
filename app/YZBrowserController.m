@@ -3604,6 +3604,8 @@ typedef enum {
 
 - (void)setEditing:(BOOL)editing {
     _editing = editing;
+    // ios draws the caret over the first letter of an empty field's placeholder
+    YZSetPlaceholder(_input, editing ? nil : YZT(@"Поиск или адрес"), [YZTheme fieldHintColor]);
     _input.textAlignment = editing ? YZTextAlignmentLeft : YZTextAlignmentCenter;
     _reloadButton.hidden = editing || [[self currentTab] isBlank];
     if (editing)
@@ -3619,7 +3621,8 @@ typedef enum {
     [self setEditing:YES];
     field.text = [self currentURL] ? [self currentURL] : @"";
     // the whole address is selected so a typed address replaces it, after the keyboard has appeared
-    [field performSelector:@selector(selectAll:) withObject:nil afterDelay:0.1];
+    if ([field.text length])
+        [field performSelector:@selector(selectAll:) withObject:nil afterDelay:0.1];
     [self refreshSuggestions];
 }
 
