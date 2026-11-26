@@ -841,6 +841,8 @@ static BOOL YZPhotoEdgeColors(UIImage *picture, CGSize view, UIColor **top, UICo
             tile.hidden = YES;
     }
     _bookmarksHeading.hidden = YES;
+    // the blocker still runs in a private tab, but the page of the private session says only what the session keeps
+    _protectedPill.hidden = YES;
     CGFloat width = self.bounds.size.width, textWidth = MIN(width - 48, (CGFloat)360);
     CGFloat top = 40;
     _heroDisc.bounds = CGRectMake(0, 0, 96, 96);
