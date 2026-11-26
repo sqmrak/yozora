@@ -9,6 +9,7 @@
 #import "YZUpdateUI.h"
 #import "YZMediaPlayer.h"
 #import "YZMotion.h"
+#import "YZPasswords.h"
 #import "YZCompat.h"
 #import "YZSettings.h"
 #import "YZSettingsController.h"
@@ -17,6 +18,7 @@
 #import "YZTheme.h"
 #include "yozora_color.h"
 #include "yozora_address.h"
+#include "yozora_password.h"
 
 static NSString *const YZTabsDefaultsKey = @"YZTabs";
 static NSString *const YZCurrentTabDefaultsKey = @"YZCurrentTab";
@@ -2088,8 +2090,10 @@ static const CGFloat YZTabStripHeight = 44;
             // the language of the page is found once it has loaded
             if (![[self currentTab] isBlank])
                 [[self currentTab].translation pageDidLoad];
+            [self fillPasswordOfLoadedPage];
             _edgeSampleDue = link.timestamp + 0.3;
         } else if (state == YOZORA_LOAD_LOADING) {
+            [self capturePasswordOfLeavingPage];
             [self setEdgeColor:nil bottom:nil];
             [[self currentTab].translation cancel];
             // a new page starts at its own size, like in Safari
@@ -2206,6 +2210,76 @@ static const CGFloat YZTabStripHeight = 44;
         owner->_popupController = nil;
         [owner updateChromeForced:YES];
     }];
+}
+
+#pragma mark passwords
+
+// a page that starts to load may be leaving a login form that was just sent: the old document and the typed fields stay until the answer of
+// the new page commits, and the script runs on the core thread before that answer is handled. an answer that commits first leaves nothing
+// to read and nothing is offered
+- (void)capturePasswordOfLeavingPage {
+    YZTab *tab = [self currentTab];
+    YZTranslation *runner = tab.translation;
+    if (!runner || !_core)
+        return;
+    [runner runScript:[YZPasswords captureScript] completion:^(NSString *answer) {
+        YZPasswordCapture *capture = [YZPasswords captureFromAnswer:answer];
+        if (capture && tab == [self currentTab])
+            [self offerToSavePassword:capture];
+    }];
+}
+
+// asks as Safari does: save (or update a changed password), never for this site, not now. an offer that meets another sheet is dropped
+- (void)offerToSavePassword:(YZPasswordCapture *)capture {
+    if (_controlSheet || _targetMenu || _filePicker || _menu || self.presentedViewController || !_tabsView.hidden)
+        return;
+    BOOL never = [YZPasswords neverSavesForSite:capture.site];
+    NSString *stored = never ? nil : [YZPasswords passwordForSite:capture.site user:capture.user];
+    yozora_password_offer offer = yozora_password_decide([capture.user UTF8String], [capture.password UTF8String], [stored UTF8String], never);
+    if (offer == YOZORA_PASSWORD_IGNORE)
+        return;
+    BOOL update = offer == YOZORA_PASSWORD_UPDATE;
+    NSString *who = [capture.user length] ? [NSString stringWithFormat:@"%@ (%@)", capture.site, capture.user] : capture.site;
+    NSString *title = [NSString stringWithFormat:update ? YZT(@"Обновить пароль для %@?") : YZT(@"Сохранить пароль для %@?"), who];
+    NSMutableArray *texts = [NSMutableArray arrayWithObject:update ? YZT(@"Обновить пароль") : YZT(@"Сохранить пароль")];
+    NSMutableArray *icons = [NSMutableArray arrayWithObject:[NSNumber numberWithInt:YZIconLock]];
+    if (!update) {
+        [texts addObject:YZT(@"Никогда для этого сайта")];
+        [icons addObject:[NSNumber numberWithInt:YZIconDelete]];
+    }
+    [texts addObject:YZT(@"Не сейчас")];
+    [icons addObject:[NSNumber numberWithInt:YZIconClose]];
+    [_input resignFirstResponder];
+    NSInteger neverIndex = update ? -1 : 1;
+    _controlSheet = [[YZPickers presentActionsInView:self.view title:title texts:texts icons:icons bottomInset:[self chromeInsets].bottom
+                                          completion:^(NSInteger index) {
+        [_controlSheet release];
+        _controlSheet = nil;
+        if (index == 0) {
+            NSString *reason = nil;
+            if (![YZPasswords savePassword:capture.password site:capture.site user:capture.user error:&reason])
+                [self showError:[NSString stringWithFormat:YZT(@"Пароль не сохранён: %@"), reason]];
+        } else if (index == neverIndex) {
+            [YZPasswords setNeverSaves:YES site:capture.site];
+        }
+    }] retain];
+}
+
+// a loaded https page with one empty password field takes the login saved last for its site, as the keychain of Safari fills it. the page
+// sees the values like typed ones, so only the exact site of the top frame gets them
+- (void)fillPasswordOfLoadedPage {
+    YZTranslation *runner = [self currentTab].translation;
+    NSString *site = [YZPasswords siteOfAddress:[self currentURL]];
+    if (!runner || !site)
+        return;
+    NSArray *accounts = [YZPasswords accountsForSite:site];
+    if (![accounts count])
+        return;
+    YZPasswordAccount *account = [accounts objectAtIndex:0];
+    NSString *password = [YZPasswords passwordForSite:site user:account.user];
+    NSString *script = password ? [YZPasswords fillScriptWithUser:account.user password:password] : nil;
+    if (script)
+        [runner runScript:script completion:^(NSString *answer) { (void)answer; }];
 }
 
 #pragma mark page and home delegates

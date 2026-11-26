@@ -171,9 +171,12 @@ function(yozora_add_core)
             "${yozora_root}/app/YZTranslateSheet.m"
             "${yozora_root}/app/YZColorPicker.m"
             "${yozora_root}/app/YZSplashController.m"
-            "${yozora_root}/app/YZTabStrip.m")
+            "${yozora_root}/app/YZTabStrip.m"
+            "${yozora_root}/app/YZPasswords.m"
+            "${yozora_root}/app/YZPasswordsController.m"
+            "${yozora_root}/core/yozora_password.c")
         target_compile_options(Yozora PRIVATE -fno-objc-arc -Wall -Wextra -Werror)
-        target_link_libraries(Yozora PRIVATE YozoraCore "-framework UIKit" "-framework QuartzCore" "-framework AVFoundation" "-framework CoreMedia" "-framework CoreGraphics" "-framework Foundation" "-framework CoreLocation" "-lobjc")
+        target_link_libraries(Yozora PRIVATE YozoraCore "-framework UIKit" "-framework QuartzCore" "-framework AVFoundation" "-framework CoreMedia" "-framework CoreGraphics" "-framework Foundation" "-framework CoreLocation" "-framework Security" "-lobjc")
         target_link_options(Yozora PRIVATE "LINKER:-dead_strip")
         add_executable(yozora-ui-tests
             "${yozora_root}/tests/test_tabs_view.m"

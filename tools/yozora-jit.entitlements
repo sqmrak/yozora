@@ -6,6 +6,10 @@
     <true/>
     <key>com.apple.developer.web-browser</key>
     <true/>
+    <key>keychain-access-groups</key>
+    <array>
+        <string>com.sqmrak.yozora</string>
+    </array>
     <key>com.apple.private.security.no-sandbox</key>
     <true/>
     <key>com.apple.security.iokit-user-client-class</key>

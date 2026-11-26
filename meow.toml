@@ -86,7 +86,7 @@ cflags = ["-fno-objc-arc", "-fno-strict-aliasing", "-fno-exceptions", "-fPIE", "
 # the order cmake linked them; CoreLocation is named here as well because a tree configured before the location
 # code did not list it
 ldflags = ["-Wl,-search_paths_first", "-Wl,-headerpad_max_install_names", "-Xlinker", "-dead_strip",
-           "-framework", "CoreLocation", "-Wl,-map,build/${slice}/Yozora.map", "@build/${slice}/link.rsp"]
+           "-framework", "CoreLocation", "-framework", "Security", "-Wl,-map,build/${slice}/Yozora.map", "@build/${slice}/link.rsp"]
 needs = ["webcore-${slice}"]
 strip = true
 entitlements = "${ENTITLEMENTS}"
@@ -103,8 +103,11 @@ files = [
   "app/YZCrash.m", "app/YZLogController.m", "app/YZSystemNotifier.m", "app/YZSitesController.m", "app/YZCertificates.m", "app/YZCertificatesController.m",
   "app/YZAdblockController.m", "app/YZDebugOverlay.m", "app/YZTranslation.m", "app/YZTranslateBar.m",
   "app/YZTranslateSheet.m", "app/YZColorPicker.m", "app/YZSplashController.m", "app/YZTabStrip.m", "app/YZTabPager.m", "app/YZTabStack.m", "app/YZSignIn.m",
+  "app/YZPasswords.m", "app/YZPasswordsController.m",
   # the blur of the start page photo is used by the app only, so it is built here and not in libYozoraCore (which needs a webkit build)
   "core/yozora_blur.c",
+  # the site of a password and whether to offer saving it, app only like the blur
+  "core/yozora_password.c",
   # libSystem has no ___divdc3 for arm64 (see the file), the empty file on armv7 costs nothing
   "core/yozora_divdc3.c",
 ]
@@ -120,7 +123,7 @@ cflags = ["-fno-objc-arc", "-fno-strict-aliasing", "-fno-exceptions", "-fPIE", "
 # the order cmake linked them; CoreLocation is named here as well because a tree configured before the location
 # code did not list it
 ldflags = ["-Wl,-search_paths_first", "-Wl,-headerpad_max_install_names", "-Xlinker", "-dead_strip",
-           "-framework", "CoreLocation", "-Wl,-map,build/${slice}/Yozora.map", "@build/${slice}/link.rsp"]
+           "-framework", "CoreLocation", "-framework", "Security", "-Wl,-map,build/${slice}/Yozora.map", "@build/${slice}/link.rsp"]
 needs = ["webcore-${slice}"]
 strip = true
 entitlements = "${ENTITLEMENTS}"
@@ -137,8 +140,11 @@ files = [
   "app/YZCrash.m", "app/YZLogController.m", "app/YZSystemNotifier.m", "app/YZSitesController.m", "app/YZCertificates.m", "app/YZCertificatesController.m",
   "app/YZAdblockController.m", "app/YZDebugOverlay.m", "app/YZTranslation.m", "app/YZTranslateBar.m",
   "app/YZTranslateSheet.m", "app/YZColorPicker.m", "app/YZSplashController.m", "app/YZTabStrip.m", "app/YZTabPager.m", "app/YZTabStack.m", "app/YZSignIn.m",
+  "app/YZPasswords.m", "app/YZPasswordsController.m",
   # the blur of the start page photo is used by the app only, so it is built here and not in libYozoraCore (which needs a webkit build)
   "core/yozora_blur.c",
+  # the site of a password and whether to offer saving it, app only like the blur
+  "core/yozora_password.c",
   # libSystem has no ___divdc3 for arm64 (see the file), the empty file on armv7 costs nothing
   "core/yozora_divdc3.c",
 ]
@@ -154,7 +160,7 @@ cflags = ["-fno-objc-arc", "-fno-strict-aliasing", "-fno-exceptions", "-fPIE", "
 # the order cmake linked them; CoreLocation is named here as well because a tree configured before the location
 # code did not list it
 ldflags = ["-Wl,-search_paths_first", "-Wl,-headerpad_max_install_names", "-Xlinker", "-dead_strip",
-           "-framework", "CoreLocation", "-Wl,-map,build/${slice}/Yozora.map", "@build/${slice}/link.rsp"]
+           "-framework", "CoreLocation", "-framework", "Security", "-Wl,-map,build/${slice}/Yozora.map", "@build/${slice}/link.rsp"]
 needs = ["webcore-${slice}"]
 strip = true
 entitlements = "${ENTITLEMENTS}"
@@ -173,8 +179,11 @@ files = [
   "app/YZCrash.m", "app/YZLogController.m", "app/YZSystemNotifier.m", "app/YZSitesController.m", "app/YZCertificates.m", "app/YZCertificatesController.m",
   "app/YZAdblockController.m", "app/YZDebugOverlay.m", "app/YZTranslation.m", "app/YZTranslateBar.m",
   "app/YZTranslateSheet.m", "app/YZColorPicker.m", "app/YZSplashController.m", "app/YZTabStrip.m", "app/YZTabPager.m", "app/YZTabStack.m", "app/YZSignIn.m",
+  "app/YZPasswords.m", "app/YZPasswordsController.m",
   # the blur of the start page photo is used by the app only, so it is built here and not in libYozoraCore (which needs a webkit build)
   "core/yozora_blur.c",
+  # the site of a password and whether to offer saving it, app only like the blur
+  "core/yozora_password.c",
   # libSystem has no ___divdc3 for arm64 (see the file), the empty file on armv7 costs nothing
   "core/yozora_divdc3.c",
 ]
@@ -2181,6 +2190,11 @@ sanitize = "address,undefined"
 
 [test.blur]
 src = ["core/yozora_blur.c", "tests/test_blur.c"]
+cflags = ["-std=c99", "-Wall", "-Wextra", "-Werror", "-pedantic", "-O1", "-g", "-Icore"]
+sanitize = "address,undefined"
+
+[test.password]
+src = ["core/yozora_password.c", "tests/test_password.c"]
 cflags = ["-std=c99", "-Wall", "-Wextra", "-Werror", "-pedantic", "-O1", "-g", "-Icore"]
 sanitize = "address,undefined"
 
