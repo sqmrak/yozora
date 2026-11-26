@@ -138,6 +138,8 @@ static UIImage *YZThumbnailFromView(UIView *view) {
 @interface YZBrowserController ()
 - (YZTab *)currentTab;
 - (void)layoutChrome;
+- (void)installEdgeSwipes;
+- (void)cancelEdgeSwipe;
 - (void)updateChromeForced:(BOOL)forced;
 - (void)updateAddressDisplay;
 - (BOOL)createCore;
@@ -239,6 +241,7 @@ static UIImage *YZThumbnailFromView(UIView *view) {
     _pageView = [[YZPageView alloc] initWithFrame:CGRectZero];
     _pageView.delegate = self;
     [self.view addSubview:_pageView];
+    [self installEdgeSwipes];
 
     _home = [[YZHomeView alloc] initWithFrame:CGRectZero];
     _home.homeDelegate = self;
@@ -1627,12 +1630,16 @@ static const CGFloat YZTabStripHeight = 44;
     [_tabsView setNeedsLayout];
     if (_menu)
         _menu.frame = bounds;
-    if (!CGRectEqualToRect(_pageView.frame, page)) {
+    // bounds and center, the page carries a transform while an edge swipe is on and a frame set under it lands in the wrong place
+    CGRect pageBounds = CGRectMake(0, 0, page.size.width, page.size.height);
+    CGPoint pageCenter = CGPointMake(CGRectGetMidX(page), CGRectGetMidY(page));
+    if (!CGRectEqualToRect(_pageView.bounds, pageBounds) || !CGPointEqualToPoint(_pageView.center, pageCenter)) {
         // another width replaces the surfaces, so old pixels must go. a keyboard only takes height and the
         // tiles stay, clearing them flashed white on a heavy page
-        if (fabs(_pageView.frame.size.width - page.size.width) >= 1)
+        if (fabs(_pageView.bounds.size.width - page.size.width) >= 1)
             [_pageView clearFrame];
-        _pageView.frame = page;
+        _pageView.bounds = pageBounds;
+        _pageView.center = pageCenter;
     }
     if (_core && page.size.width >= 1 && page.size.height >= 1) {
         if (!yozora_core_resize(_core, (unsigned)page.size.width, (unsigned)page.size.height, (float)[[UIScreen mainScreen] scale] * _pageView.rasterFactor))
@@ -2161,6 +2168,171 @@ static const CGFloat YZTabStripHeight = 44;
 - (void)forwardPressed {
     if (_core && !yozora_core_forward(_core))
         [self showBanner:YZT(@"Вперёд перейти нельзя")];
+}
+
+#pragma mark edge swipes
+
+static const CGFloat YZEdgeKeySize = 44;
+
+// UIScreenEdgePanGestureRecognizer exists from ios 7: older systems keep the keys of the bar
+- (void)installEdgeSwipes {
+    Class edge = NSClassFromString(@"UIScreenEdgePanGestureRecognizer");
+    if (!edge)
+        return;
+    _edgeBack = [[edge alloc] initWithTarget:self action:@selector(edgeSwiped:)];
+    _edgeForward = [[edge alloc] initWithTarget:self action:@selector(edgeSwiped:)];
+    // UIRectEdgeLeft and UIRectEdgeRight
+    [_edgeBack setValue:[NSNumber numberWithUnsignedInteger:1 << 1] forKey:@"edges"];
+    [_edgeForward setValue:[NSNumber numberWithUnsignedInteger:1 << 3] forKey:@"edges"];
+    for (UIPanGestureRecognizer *recognizer in [NSArray arrayWithObjects:_edgeBack, _edgeForward, nil]) {
+        recognizer.delegate = self;
+        [self.view addGestureRecognizer:recognizer];
+    }
+}
+
+- (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)recognizer {
+    if (recognizer != _edgeBack && recognizer != _edgeForward)
+        return YES;
+    if (!_core || _editing || _pageEditing || [self findBarOpen] || !_tabsView.hidden || _menu || _controlSheet || _targetMenu || _filePicker
+        || self.presentedViewController || [[self currentTab] isBlank])
+        return NO;
+    return recognizer == _edgeBack ? yozora_core_can_go_back(_core) != 0 : yozora_core_can_go_forward(_core) != 0;
+}
+
+// a drag on the page waits until the edge swipe has failed, which it does at once for a touch that did not start at the edge
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)recognizer shouldBeRequiredToFailByGestureRecognizer:(UIGestureRecognizer *)other {
+    return (recognizer == _edgeBack || recognizer == _edgeForward) && [other isKindOfClass:[UIPanGestureRecognizer class]]
+        && other.view && [other.view isDescendantOfView:_pageView];
+}
+
+- (CGFloat)edgeThreshold {
+    return MIN(self.view.bounds.size.width * 0.3f, (CGFloat)120);
+}
+
+- (void)placeEdgeKeyForPull:(CGFloat)pull back:(BOOL)back y:(CGFloat)y {
+    CGFloat width = self.view.bounds.size.width;
+    CGFloat progress = MIN((CGFloat)1, pull / [self edgeThreshold]);
+    CGFloat reveal = progress * (YZEdgeKeySize + 12);
+    _edgeKey.center = CGPointMake(back ? reveal - YZEdgeKeySize / 2 : width - reveal + YZEdgeKeySize / 2, y);
+    _edgeKey.alpha = progress;
+    CGFloat scale = 0.6f + 0.4f * progress;
+    _edgeKey.transform = CGAffineTransformMakeScale(scale, scale);
+}
+
+- (void)setEdgeKeyArmed:(BOOL)armed {
+    if (armed == _edgeArmed)
+        return;
+    _edgeArmed = armed;
+    _edgeKey.backgroundColor = armed ? [YZTheme barHighlightColor] : [UIColor colorWithWhite:0.22f alpha:0.92f];
+    if (armed && [YZTheme animationsEnabled]) {
+        UIView *key = _edgeKey;
+        CGAffineTransform rest = key.transform;
+        [UIView animateWithDuration:0.1 animations:^{ key.transform = CGAffineTransformScale(rest, 1.15f, 1.15f); }
+                         completion:^(BOOL finished) {
+            (void)finished;
+            [UIView animateWithDuration:0.12 animations:^{ key.transform = rest; }];
+        }];
+    }
+}
+
+- (void)endEdgeSwipe {
+    [_edgeKey removeFromSuperview];
+    [_edgeKey release];
+    _edgeKey = nil;
+    _edgeArmed = NO;
+    _pageView.transform = CGAffineTransformIdentity;
+    _pageView.alpha = 1;
+    _pageView.layer.cornerRadius = 0;
+    _pageView.layer.masksToBounds = _edgeClipped;
+}
+
+- (void)edgeSwiped:(UIPanGestureRecognizer *)gesture {
+    BOOL back = gesture == _edgeBack;
+    CGFloat direction = back ? 1 : -1;
+    CGFloat width = self.view.bounds.size.width;
+    CGFloat pull = MAX((CGFloat)0, direction * [gesture translationInView:self.view].x);
+    CGFloat progress = MIN((CGFloat)1, pull / [self edgeThreshold]);
+    switch (gesture.state) {
+    case UIGestureRecognizerStateBegan: {
+        if (_edgeKey)
+            [self endEdgeSwipe];
+        _edgeKey = [[UIView alloc] initWithFrame:CGRectMake(0, 0, YZEdgeKeySize, YZEdgeKeySize)];
+        _edgeKey.userInteractionEnabled = NO;
+        _edgeKey.layer.cornerRadius = YZEdgeKeySize / 2;
+        _edgeKey.backgroundColor = [UIColor colorWithWhite:0.22f alpha:0.92f];
+        _edgeKey.alpha = 0;
+        UIImageView *arrow = [[UIImageView alloc] initWithImage:[YZTheme chromeIcon:(back ? YZIconBack : YZIconForward) size:24 color:[UIColor whiteColor]]];
+        arrow.contentMode = UIViewContentModeCenter;
+        arrow.frame = _edgeKey.bounds;
+        [_edgeKey addSubview:arrow];
+        [arrow release];
+        [self.view addSubview:_edgeKey];
+        _edgeClipped = _pageView.layer.masksToBounds;
+        _pageView.layer.masksToBounds = YES;
+        _edgeArmed = NO;
+    }
+        // fall through: the first change is part of the same gesture
+    case UIGestureRecognizerStateChanged: {
+        CGFloat shift = MIN(pull * 0.5f, (CGFloat)64);
+        CGFloat scale = 1 - 0.05f * progress;
+        _pageView.transform = CGAffineTransformScale(CGAffineTransformMakeTranslation(direction * shift, 0), scale, scale);
+        _pageView.layer.cornerRadius = 20 * progress;
+        [self placeEdgeKeyForPull:pull back:back y:[gesture locationInView:self.view].y];
+        [self setEdgeKeyArmed:pull >= [self edgeThreshold]];
+        break;
+    }
+    case UIGestureRecognizerStateEnded: {
+        BOOL commit = pull >= [self edgeThreshold] || direction * [gesture velocityInView:self.view].x > 700;
+        if (!commit) {
+            [self cancelEdgeSwipe];
+            break;
+        }
+        if (![YZTheme animationsEnabled]) {
+            [self endEdgeSwipe];
+            back ? [self backPressed] : [self forwardPressed];
+            break;
+        }
+        // the page leaves on the side the finger pulled to, the next one comes from the other side
+        [UIView animateWithDuration:0.14 delay:0 options:UIViewAnimationOptionCurveEaseIn animations:^{
+            _pageView.transform = CGAffineTransformMakeTranslation(direction * width * 0.2f, 0);
+            _pageView.alpha = 0;
+            _edgeKey.alpha = 0;
+        } completion:^(BOOL finished) {
+            (void)finished;
+            [self endEdgeSwipe];
+            back ? [self backPressed] : [self forwardPressed];
+            _pageView.transform = CGAffineTransformMakeTranslation(-direction * width * 0.06f, 0);
+            _pageView.alpha = 0;
+            [UIView animateWithDuration:0.24 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+                _pageView.transform = CGAffineTransformIdentity;
+                _pageView.alpha = 1;
+            } completion:nil];
+        }];
+        break;
+    }
+    case UIGestureRecognizerStateCancelled:
+    case UIGestureRecognizerStateFailed:
+        [self cancelEdgeSwipe];
+        break;
+    default:
+        break;
+    }
+}
+
+- (void)cancelEdgeSwipe {
+    if (![YZTheme animationsEnabled]) {
+        [self endEdgeSwipe];
+        return;
+    }
+    [UIView animateWithDuration:0.22 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+        _pageView.transform = CGAffineTransformIdentity;
+        _pageView.layer.cornerRadius = 0;
+        _edgeKey.alpha = 0;
+        _edgeKey.transform = CGAffineTransformMakeScale(0.6f, 0.6f);
+    } completion:^(BOOL finished) {
+        (void)finished;
+        [self endEdgeSwipe];
+    }];
 }
 
 - (void)reloadPressed {
@@ -3208,6 +3380,11 @@ static UIImage *YZMicImage(CGFloat size, UIColor *color) {
 
 - (void)dealloc {
     [NSObject cancelPreviousPerformRequestsWithTarget:self];
+    _edgeBack.delegate = nil;
+    _edgeForward.delegate = nil;
+    [_edgeBack release];
+    [_edgeForward release];
+    [_edgeKey release];
     [self closePageControls];
     [self closeSharePopover];
     _findBar.delegate = nil;

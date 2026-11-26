@@ -29,7 +29,7 @@
 @interface YZBrowserController : UIViewController <UITextFieldDelegate, UITableViewDataSource, UITableViewDelegate,
                                                    YZPageViewDelegate, YZHomeViewDelegate,
                                                    YZTabsViewDelegate, YZMenuViewDelegate, YZListControllerDelegate,
-                                                   YZSettingsControllerDelegate, YZVideoControllerDelegate, YZDownloadsControllerDelegate, YZFindBarDelegate, YZTabStripDelegate, UIPopoverControllerDelegate, YZTranslationDelegate, YZTranslateBarDelegate> {
+                                                   YZSettingsControllerDelegate, YZVideoControllerDelegate, YZDownloadsControllerDelegate, YZFindBarDelegate, YZTabStripDelegate, UIPopoverControllerDelegate, YZTranslationDelegate, YZTranslateBarDelegate, UIGestureRecognizerDelegate> {
     YZStore *_store;
     // the shown tabs and the open one, the other mode's tabs wait in _otherTabs
     NSMutableArray *_tabs;
@@ -142,6 +142,13 @@
     BOOL _editing;
     // a field of the page has the keyboard, which can lag behind isFirstResponder inside the show notification
     BOOL _pageEditing;
+    // swipes from the side edges: back from the left one, forward from the right one (ios 7 and later). the page follows the finger
+    // and a round key with the arrow grows at the edge until the pull is long enough
+    UIPanGestureRecognizer *_edgeBack;
+    UIPanGestureRecognizer *_edgeForward;
+    UIView *_edgeKey;
+    BOOL _edgeArmed;
+    BOOL _edgeClipped;
     dispatch_queue_t _saveQueue;
 
     // what the chrome currently shows, so a frame only touches views whose value changed
