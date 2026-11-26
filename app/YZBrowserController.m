@@ -3567,6 +3567,29 @@ static UIImage *YZMicImage(CGFloat size, UIColor *color) {
     return [_suggestions count];
 }
 
+// the mark at the head of every suggestion, as Firefox has it: a magnifier on a tonal disc. drawn once for the colors of the theme in use
+static UIImage *YZSuggestionMark(void) {
+    static UIImage *mark;
+    static NSString *markKey;
+    UIColor *plate = [YZTheme stateColor], *ink = [YZTheme accentColor];
+    NSString *key = [NSString stringWithFormat:@"%@|%@", plate, ink];
+    if (mark && [key isEqualToString:markKey])
+        return mark;
+    CGFloat side = 36;
+    UIImage *glyph = [YZTheme icon:YZIconSearch size:20 color:ink];
+    UIGraphicsBeginImageContextWithOptions(CGSizeMake(side, side), NO, 0);
+    [plate setFill];
+    [[UIBezierPath bezierPathWithOvalInRect:CGRectMake(0, 0, side, side)] fill];
+    [glyph drawInRect:CGRectMake((side - 20) / 2, (side - 20) / 2, 20, 20)];
+    UIImage *drawn = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    [mark release];
+    mark = [drawn retain];
+    [markKey release];
+    markKey = [key copy];
+    return mark;
+}
+
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
     static NSString *identifier = @"suggestion";
     UITableViewCell *cell = [table dequeueReusableCellWithIdentifier:identifier];
@@ -3584,6 +3607,7 @@ static UIImage *YZMicImage(CGFloat size, UIColor *color) {
     YZRecord *record = [_suggestions objectAtIndex:path.row];
     cell.textLabel.text = [record displayTitle];
     cell.detailTextLabel.text = record.url;
+    cell.imageView.image = YZSuggestionMark();
     return cell;
 }
 
