@@ -12,6 +12,9 @@
 #import "YZSettings.h"
 #import "YZStrings.h"
 #import "YZTheme.h"
+#include <sys/stat.h>
+#include <unistd.h>
+#include <errno.h>
 #include "yozora_core.h"
 #include "webgl/yozora_gl.h"
 
@@ -303,12 +306,31 @@ static void YZDownloadObserver(unsigned identifier, int state, void *context) {
     dispatch_async(dispatch_get_main_queue(), ^{ [delegate downloadEnded:identifier state:state]; });
 }
 
+// a rootless jailbreak runs the app without its sandbox (com.apple.private.security.no-sandbox) but still hands it the data container
+// as home, and a process outside the sandbox gets EPERM from mkdir there: the profile, the logs, the caches and the certificates
+// all failed with Cocoa error 513. the real home of the user takes the container's place when the container refuses a directory
+static void YZUseWritableHome(void) {
+    const char *home = [NSHomeDirectory() fileSystemRepresentation];
+    char probe[1024];
+    if (snprintf(probe, sizeof probe, "%s/Library/.yozora-write-probe", home) >= (int)sizeof probe)
+        return;
+    if (mkdir(probe, 0700) == 0) {
+        rmdir(probe);
+        return;
+    }
+    // a missing Library is created later by the app itself, only a refusal means the container cannot be used
+    if (errno != EPERM && errno != EACCES)
+        return;
+    setenv("CFFIXED_USER_HOME", "/var/mobile", 1);
+}
+
 int main(int argc, char **argv) {
     // NSLog of an app started from the home screen goes to the system log only, which a phone without syslogd keeps
     // nowhere. with this CoreFoundation also writes to stderr, which the log capture reads: the zombie's line with
     // the class and the selector (and every NSLog of the app) then reaches the log file
     setenv("CFLOG_FORCE_STDERR", "1", 1);
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    YZUseWritableHome();
     // before JavaScriptCore: its start maps the jit region and a signal there happened ahead of the recorder
     // that used to be installed in didFinishLaunching, so a launch crash on a new ios left no file at all
     [YZCrash install];

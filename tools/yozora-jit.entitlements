@@ -6,6 +6,8 @@
     <true/>
     <key>com.apple.developer.web-browser</key>
     <true/>
+    <key>com.apple.private.security.no-sandbox</key>
+    <true/>
     <key>com.apple.security.iokit-user-client-class</key>
     <array>
         <string>AGXDeviceUserClient</string>
