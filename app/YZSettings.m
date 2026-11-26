@@ -4,6 +4,7 @@
 #import "YZStore.h"
 #import "YZCrash.h"
 #include "yozora_core.h"
+#include "yozora_home.h"
 #include "yozora_translate.h"
 #include <math.h>
 
@@ -23,6 +24,7 @@ static NSString *const YZMascotKey = @"YZMascot";
 static NSString *const YZTabsLayoutKey = @"YZTabsLayout";
 static NSString *const YZDesignKey = @"YZDesign";
 static NSString *const YZBarLayoutKey = @"YZBarLayout";
+static NSString *const YZHomeOrderKey = @"YZHomeOrder";
 static NSString *const YZMascotGlowKey = @"YZMascotGlow";
 static NSString *const YZDnsServerKey = @"YZDnsServer";
 static NSString *const YZHomeBackgroundStampKey = @"YZHomeBackgroundStamp";
@@ -150,6 +152,34 @@ static NSInteger YZDesignCurrent = -1;
     return [self integerForKey:YZBarLayoutKey defaultValue:YZBarLayoutBottom] == YZBarLayoutTop ? YZBarLayoutTop : YZBarLayoutBottom;
 }
 + (void)setBarLayout:(YZBarLayout)layout { [self storeInteger:layout forKey:YZBarLayoutKey]; }
+
++ (NSArray *)homeOrder {
+    uint8_t order[YOZORA_HOME_BLOCKS];
+    yozora_home_order_parse([[[NSUserDefaults standardUserDefaults] stringForKey:YZHomeOrderKey] UTF8String], order);
+    NSMutableArray *boxed = [NSMutableArray arrayWithCapacity:YOZORA_HOME_BLOCKS];
+    for (int i = 0; i < YOZORA_HOME_BLOCKS; ++i)
+        [boxed addObject:[NSNumber numberWithInt:order[i]]];
+    return boxed;
+}
+
++ (void)setHomeOrder:(NSArray *)order {
+    uint8_t blocks[YOZORA_HOME_BLOCKS];
+    char text[16];
+    BOOL valid = [order count] == YOZORA_HOME_BLOCKS;
+    for (NSUInteger i = 0; valid && i < YOZORA_HOME_BLOCKS; ++i) {
+        int value = [[order objectAtIndex:i] intValue];
+        valid = value >= 0 && value < YOZORA_HOME_BLOCKS;
+        blocks[i] = (uint8_t)value;
+    }
+    if (!valid || !yozora_home_order_format(blocks, text, sizeof text)) {
+        NSLog(@"yozora: the order of the start page is not a permutation and is not stored");
+        return;
+    }
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setObject:[NSString stringWithUTF8String:text] forKey:YZHomeOrderKey];
+    [defaults synchronize];
+    [[NSNotificationCenter defaultCenter] postNotificationName:YZSettingsDidChangeNotification object:self];
+}
 
 // the girl that came with the app until the person picks the fox, a value of a later version counts as the girl
 + (YZMascot)mascot {
@@ -363,6 +393,72 @@ static void YZClearAccent(BOOL isPrivate) {
 #endif
 }
 + (void)setJit:(BOOL)enabled { [self storeBool:enabled forKey:YZJitKey]; }
++ (BOOL)homeShows:(int)part {
+    return [self boolForKey:[NSString stringWithFormat:@"YZHomeShows%d", part] defaultValue:YES];
+}
++ (void)setHome:(int)part shown:(BOOL)shown {
+    [self storeBool:shown forKey:[NSString stringWithFormat:@"YZHomeShows%d", part]];
+}
++ (NSString *)homeName {
+    NSString *name = [[NSUserDefaults standardUserDefaults] stringForKey:@"YZHomeName"];
+    return [name length] ? name : @"Yozora";
+}
+static NSString *const YZHomeSiteOrderKey = @"YZHomeSiteOrder";
+static NSString *const YZHomeFavoriteOrderKey = @"YZHomeFavoriteOrder";
+static NSString *const YZHomeHiddenSitesKey = @"YZHomeHiddenSites";
+static NSString *const YZHomeGradientKey = @"YZHomeGradient";
+
+// only strings are taken, the newest YOZORA_HOME_LIST_MAX of them
++ (NSArray *)homeListForKey:(NSString *)key {
+    id stored = [[NSUserDefaults standardUserDefaults] objectForKey:key];
+    if (![stored isKindOfClass:[NSArray class]])
+        return [NSArray array];
+    NSMutableArray *urls = [NSMutableArray array];
+    for (id url in stored) {
+        if ([url isKindOfClass:[NSString class]] && [url length])
+            [urls addObject:url];
+    }
+    if ([urls count] > YOZORA_HOME_LIST_MAX)
+        [urls removeObjectsInRange:NSMakeRange(0, [urls count] - YOZORA_HOME_LIST_MAX)];
+    return urls;
+}
++ (void)storeHomeList:(NSArray *)urls forKey:(NSString *)key {
+    NSMutableArray *kept = [NSMutableArray array];
+    for (id url in urls) {
+        if ([url isKindOfClass:[NSString class]] && [url length] && ![kept containsObject:url])
+            [kept addObject:url];
+    }
+    if ([kept count] > YOZORA_HOME_LIST_MAX)
+        [kept removeObjectsInRange:NSMakeRange(0, [kept count] - YOZORA_HOME_LIST_MAX)];
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setObject:kept forKey:key];
+    [defaults synchronize];
+    [[NSNotificationCenter defaultCenter] postNotificationName:YZSettingsDidChangeNotification object:self];
+}
++ (NSArray *)homeSiteOrder { return [self homeListForKey:YZHomeSiteOrderKey]; }
++ (void)setHomeSiteOrder:(NSArray *)urls { [self storeHomeList:urls forKey:YZHomeSiteOrderKey]; }
++ (NSArray *)homeFavoriteOrder { return [self homeListForKey:YZHomeFavoriteOrderKey]; }
++ (void)setHomeFavoriteOrder:(NSArray *)urls { [self storeHomeList:urls forKey:YZHomeFavoriteOrderKey]; }
++ (NSArray *)homeHiddenSites { return [self homeListForKey:YZHomeHiddenSitesKey]; }
++ (void)hideHomeSite:(NSString *)url {
+    if (![url length])
+        return;
+    NSMutableArray *hidden = [NSMutableArray arrayWithArray:[self homeHiddenSites]];
+    [hidden removeObject:url];
+    [hidden addObject:url];
+    [self storeHomeList:hidden forKey:YZHomeHiddenSitesKey];
+}
++ (BOOL)homeGradient { return [self boolForKey:YZHomeGradientKey defaultValue:NO]; }
++ (void)setHomeGradient:(BOOL)enabled { [self storeBool:enabled forKey:YZHomeGradientKey]; }
++ (void)setHomeName:(NSString *)name {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *trimmed = [name stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([trimmed length] && ![trimmed isEqualToString:@"Yozora"])
+        [defaults setObject:[trimmed length] > 40 ? [trimmed substringToIndex:40] : trimmed forKey:@"YZHomeName"];
+    else
+        [defaults removeObjectForKey:@"YZHomeName"];
+    [defaults synchronize];
+}
 + (BOOL)metal { return [self boolForKey:YZMetalKey defaultValue:YES]; }
 + (void)setMetal:(BOOL)enabled { [self storeBool:enabled forKey:YZMetalKey]; }
 + (BOOL)jitAnswered { return [[NSUserDefaults standardUserDefaults] objectForKey:YZJitKey] != nil; }

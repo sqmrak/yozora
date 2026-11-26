@@ -1,6 +1,7 @@
 #import <objc/message.h>
 #import "YZBrowserController.h"
 #import "YZCertificates.h"
+#import "YZHomeElementsEditor.h"
 #import "YZClassic.h"
 #import "YZSystemNotifier.h"
 #import "YZControls.h"
@@ -18,6 +19,7 @@
 #import "YZTheme.h"
 #include "yozora_color.h"
 #include "yozora_address.h"
+#include "yozora_home.h"
 #include "yozora_password.h"
 
 static NSString *const YZTabsDefaultsKey = @"YZTabs";
@@ -263,6 +265,8 @@ static UIImage *YZThumbnailFromView(UIView *view) {
     _home = [[YZHomeView alloc] initWithFrame:CGRectZero];
     _home.homeDelegate = self;
     [self.view addSubview:_home];
+    // the ground of the start page takes the whole screen, under the page and the bars, and the strips of a blank tab show it
+    [self.view insertSubview:_home.groundView belowSubview:_home];
 
     _errorPage = [[YZErrorPage alloc] initWithTarget:self action:@selector(retryPagePressed)];
     _errorPage.hidden = YES;
@@ -1389,6 +1393,8 @@ static void YZOpenInOtherApp(NSURL *url, BOOL universalOnly, void (^done)(BOOL o
     BOOL blank = [tab isBlank] && !failed;
     BOOL appearing = _home.hidden && blank;
     [YZTheme setView:_home shown:blank scale:1];
+    [YZTheme setView:_home.groundView shown:blank scale:1];
+    [self paintBarsOverHome:blank force:NO];
     _errorPage.hidden = !failed;
     if (failed) {
         const char *status = yozora_core_status(_core);
@@ -1521,6 +1527,8 @@ static const CGFloat YZTabStripHeight = 44;
     else if (atBottom && ![YZTheme isClassic])
         stripColor = _edgeColor ? _edgeColor : [YZTheme surfaceColor];
     statusStrip.backgroundColor = stripColor;
+    _home.groundView.frame = bounds;
+    [_home groundResized];
     // the page ends above the home indicator in the top layout
     BOOL footShown = !_barsOverHome && atTop && ![YZTheme isClassic] && _edgeBottomColor && bottom > 0 && _keyboardHeight <= 0 && !_editing;
     if (footShown && !_footStrip) {
@@ -1638,6 +1646,8 @@ static const CGFloat YZTabStripHeight = 44;
     // the page stands between the notch insets, the bars keep the full width
     CGRect page = CGRectMake(insets.left, pageTop, MAX((CGFloat)0, inner), MAX((CGFloat)0, height - pageTop - covered));
     _home.frame = page;
+    _backgroundEditor.frame = page;
+    _elementsEditor.frame = page;
     _errorPage.frame = page;
     _banner.frame = CGRectMake(insets.left + 12, pageTop + 8, MAX((CGFloat)0, inner - 24), 44);
     if (_debugOverlay) {
@@ -2309,6 +2319,142 @@ static const CGFloat YZTabStripHeight = 44;
     [self loadURL:url];
 }
 
+typedef enum { YZHomeActionBackground, YZHomeActionAdd, YZHomeActionRemove, YZHomeActionReset, YZHomeActionElements } YZHomeAction;
+
+// a held finger on the start page: the background, a new site, the tile under the finger, the order of the blocks back to the default once it
+// was changed, and the parts of the page. a favorite taken off the page leaves the favorites, a visited site is only hidden from the page and
+// stays in the history
+- (void)homeView:(YZHomeView *)view didHoldAt:(CGPoint)point siteURL:(NSString *)siteURL favorite:(BOOL)favorite {
+    (void)view;
+    if (_targetMenu || _menu || _controlSheet || _filePicker || self.presentedViewController || !_tabsView.hidden)
+        return;
+    NSMutableArray *texts = [NSMutableArray array], *icons = [NSMutableArray array], *actions = [NSMutableArray array];
+    void (^add)(YZHomeAction, NSString *, YZIcon) = ^(YZHomeAction action, NSString *title, YZIcon icon) {
+        [texts addObject:title];
+        [icons addObject:[NSNumber numberWithInt:icon]];
+        [actions addObject:[NSNumber numberWithInt:action]];
+    };
+    add(YZHomeActionBackground, YZT(@"Фон"), YZIconImage);
+    add(YZHomeActionAdd, YZT(@"Добавить веб-сайт"), YZIconPlus);
+    if ([siteURL length])
+        add(YZHomeActionRemove, YZT(@"Убрать с главного экрана"), YZIconDelete);
+    NSArray *order = [YZSettings homeOrder];
+    uint8_t standard[YOZORA_HOME_BLOCKS];
+    yozora_home_order_default(standard);
+    BOOL custom = NO;
+    for (NSUInteger i = 0; i < [order count]; ++i)
+        custom = custom || [[order objectAtIndex:i] intValue] != standard[i];
+    if (custom)
+        add(YZHomeActionReset, YZT(@"Вернуть порядок"), YZIconSwap);
+    add(YZHomeActionElements, YZT(@"Настроить элементы"), YZIconSettings);
+    [_input resignFirstResponder];
+    __block YZPopupMenu *menu = nil;
+    NSString *held = [[siteURL copy] autorelease];
+    menu = [[YZPopupMenu alloc] initWithTitles:texts icons:icons handler:^(NSInteger index) {
+        if (_targetMenu == menu) {
+            [_targetMenu release];
+            _targetMenu = nil;
+        }
+        if (index < 0 || index >= (NSInteger)[actions count])
+            return;
+        switch ((YZHomeAction)[[actions objectAtIndex:index] intValue]) {
+        case YZHomeActionBackground:
+            [self presentHomeBackground];
+            break;
+        case YZHomeActionAdd:
+            [self askForSiteToAdd];
+            break;
+        case YZHomeActionRemove:
+            if (!favorite)
+                [YZSettings hideHomeSite:held];
+            else if (![_store removeBookmarkWithURL:held])
+                [self showError:YZT(@"Не удалось убрать сайт")];
+            [self showHome];
+            break;
+        case YZHomeActionElements:
+            [self presentHomeElements];
+            break;
+        case YZHomeActionReset:
+            [YZSettings setHomeOrder:[NSArray arrayWithObjects:[NSNumber numberWithInt:YOZORA_HOME_BRAND], [NSNumber numberWithInt:YOZORA_HOME_SITES],
+                                      [NSNumber numberWithInt:YOZORA_HOME_FAVORITES], nil]];
+            [_home relayoutAnimated];
+            break;
+        }
+    }];
+    menu.bottomInset = [self chromeInsets].bottom + (_bottomBarShown ? [self bottomBlockHeight] : 0);
+    _targetMenu = menu;
+    [menu showInView:self.view anchor:point];
+}
+
+// the controls of the background stand on the start page itself, over its foot, and the page shows the change under them
+- (void)presentHomeBackground {
+    if (_backgroundEditor)
+        return;
+    _backgroundEditor = [[YZHomeBackgroundEditor alloc] initWithHome:_home host:self changed:^{ [_home applyTheme]; } finished:^{
+        [_backgroundEditor release];
+        _backgroundEditor = nil;
+    }];
+    [_backgroundEditor presentInView:self.view];
+    _backgroundEditor.frame = _home.frame;
+}
+
+// the switches of the parts of the page stand on the page itself over its foot and the page shows every change under them
+- (void)presentHomeElements {
+    if (_elementsEditor)
+        return;
+    _elementsEditor = [[YZHomeElementsEditor alloc] initWithHome:_home changed:^{ [_home relayoutAnimated]; } finished:^{
+        [_elementsEditor release];
+        _elementsEditor = nil;
+    }];
+    [_elementsEditor presentInView:self.view];
+    _elementsEditor.frame = _home.frame;
+}
+
+// the search line of the start page opens the address field as a tap on the address bar does
+- (void)homeViewDidTapSearch:(YZHomeView *)view {
+    (void)view;
+    [_input becomeFirstResponder];
+}
+
+// the plus tile: a card with one field. only an address of a site is kept, the text that would be searched for is refused
+- (void)homeViewDidTapAdd:(YZHomeView *)view {
+    (void)view;
+    [self askForSiteToAdd];
+}
+
+- (void)askForSiteToAdd {
+    if (_addSiteDialog || self.presentedViewController)
+        return;
+    __block YZBrowserController *me = self;
+    _addSiteDialog = [[YZDialog dialogWithTitle:YZT(@"Добавить веб-сайт") message:nil cancelTitle:YZT(@"Отмена") confirmTitle:YZT(@"Добавить") destructive:NO
+                                        handler:^(NSInteger index, NSArray *texts) {
+        [me->_addSiteDialog release];
+        me->_addSiteDialog = nil;
+        if (index != 1 || ![texts count])
+            return;
+        [me addSiteWithText:[texts objectAtIndex:0]];
+    }] retain];
+    [_addSiteDialog setFieldPlaceholders:[NSArray arrayWithObject:YZT(@"Адрес сайта")] secureIndex:-1];
+    [_addSiteDialog showInView:self.view];
+}
+
+- (void)addSiteWithText:(NSString *)text {
+    NSString *typed = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    char address[YOZORA_URL_CAP], host[256];
+    if (![typed length] || yozora_address_resolve([typed UTF8String], [YZSettings searchEngine], address, sizeof address) != YOZORA_ADDRESS_URL) {
+        [self showError:YZT(@"Этот адрес не поддерживается")];
+        return;
+    }
+    NSString *url = [NSString stringWithUTF8String:address];
+    NSString *title = yozora_address_host(address, host, sizeof host) ? [NSString stringWithUTF8String:host] : url;
+    if (![_store addBookmarkWithURL:url title:title]) {
+        [self showError:YZT(@"Не удалось добавить сайт")];
+        return;
+    }
+    [self showHome];
+    [_home relayoutAnimated];
+}
+
 #pragma mark bottom bar actions
 
 - (void)backPressed {
@@ -2559,6 +2705,12 @@ static UIColor *YZColorFromCSS(NSString *text) {
 
 // the page is asked after a load and a moment after the scroll stopped, a page is not asked while it moves
 - (void)trackEdgeColorAtTime:(CFTimeInterval)now {
+    // the start page is no site to ask: it says itself what stands at its edges, the surface, the gradient or the photo
+    if (!_home.hidden && ![YZTheme isClassic]) {
+        _edgeSampleDue = 0;
+        [self setEdgeColor:_home.topEdgeColor bottom:_home.bottomEdgeColor];
+        return;
+    }
     if (!_core || [YZTheme isClassic] || [[self currentTab] isBlank]) {
         _edgeSampleDue = 0;
         [self setEdgeColor:nil bottom:nil];
@@ -2801,6 +2953,26 @@ static UIColor *YZColorFromCSS(NSString *text) {
 }
 
 // ios 13 and later ignore UIApplication setStatusBarStyle when the controller owns the status bar
+// the start page of the modern design shows its ground under every bar: the bars and the skirt under the bottom one are clear while it is
+// shown and take the color of the theme again when a site is
+- (void)paintBarsOverHome:(BOOL)home force:(BOOL)force {
+    BOOL over = home && [YZTheme isFloatingBar];
+    if (over == _barsOverHome && !force)
+        return;
+    _barsOverHome = over;
+    UIColor *clear = [UIColor clearColor];
+    if (over) {
+        [(YZSystemBarView *)_topBar setTop:clear bottom:clear];
+        [(YZSystemBarView *)_bottomBar setTop:clear bottom:clear];
+        [_bottomBar viewWithTag:YZBottomSkirtTag].backgroundColor = clear;
+    } else if (!force) {
+        [(YZSystemBarView *)_topBar applyTheme];
+        [(YZSystemBarView *)_bottomBar applyTheme];
+        [_bottomBar viewWithTag:YZBottomSkirtTag].backgroundColor = [YZTheme toolbarColor];
+    }
+    [self.view setNeedsLayout];
+}
+
 - (UIStatusBarStyle)preferredStatusBarStyle {
     if (_edgeColor && ([self layoutAtBottom] || _barsOverHome) && ![YZTheme isClassic]) {
         CGFloat red, green, blue, alpha;
@@ -2831,6 +3003,7 @@ static UIColor *YZColorFromCSS(NSString *text) {
     [self.view setNeedsLayout];
     [(YZSystemBarView *)_bottomBar applyTheme];
     [_bottomBar viewWithTag:YZBottomSkirtTag].backgroundColor = [YZTheme toolbarColor];
+    [self paintBarsOverHome:!_home.hidden force:YES];
     [self styleField];
     _progress.backgroundColor = [YZTheme barHighlightProgressColor];
     _banner.backgroundColor = [YZTheme cardColor];
@@ -3741,6 +3914,9 @@ static UIImage *YZSuggestionMark(void) {
     [_signInDialog release];
     [_jitDialog dismissSilently];
     [_jitDialog release];
+    [_addSiteDialog dismissSilently];
+    [_addSiteDialog release];
+    [_backgroundEditor release];
     [_signIn release];
     [_geoAlert dismissSilently];
     [_geoAlert release];

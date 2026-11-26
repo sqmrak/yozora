@@ -1,6 +1,8 @@
 #import <UIKit/UIKit.h>
 #import <QuartzCore/QuartzCore.h>
 #import "YZHomeView.h"
+#import "YZHomeBackgroundEditor.h"
+#import "YZHomeElementsEditor.h"
 #import "YZVoiceInput.h"
 #import "YZListController.h"
 #import "YZMenuView.h"
@@ -53,6 +55,11 @@
     YZDialog *_signInDialog;
     // the question about the jit, asked once, and the notice that a failed start turned it off
     YZDialog *_jitDialog;
+    // the question of the plus tile of the start page: the address of a site to keep there
+    YZDialog *_addSiteDialog;
+    // the controls of the photo behind the start page while they stand on it
+    YZHomeBackgroundEditor *_backgroundEditor;
+    YZHomeElementsEditor *_elementsEditor;
     YZSignIn *_signIn;
     YZTab *_signInTab;
     // the sign in switched to the private tabs, so it switches back when it ends
@@ -155,6 +162,8 @@
     // the same at the bottom edge, the strip over the home indicator takes it
     UIColor *_edgeBottomColor;
     UIView *_footStrip;
+    // the start page is shown in the modern design: its ground fills the screen and the bars and strips over it are clear
+    BOOL _barsOverHome;
     int _edgeScroll;
     CFTimeInterval _edgeSampleDue;
     BOOL _edgeSampling;

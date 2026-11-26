@@ -49,6 +49,8 @@ typedef enum {
 extern NSString *const YZSettingsDidChangeNotification;
 
 /* what the user chose in the settings, kept in the user defaults */
+enum { YZHomePartLogo, YZHomePartName, YZHomePartSearch, YZHomePartRecent };
+
 @interface YZSettings : NSObject
 + (YZLanguage)language;
 + (void)setLanguage:(YZLanguage)language;
@@ -64,6 +66,10 @@ extern NSString *const YZSettingsDidChangeNotification;
 /* an unset choice is the bar at the bottom */
 + (YZBarLayout)barLayout;
 + (void)setBarLayout:(YZBarLayout)layout;
+/* the blocks of the start page top to bottom, YOZORA_HOME_* values (core/yozora_home.h) boxed in NSNumber, always all three. an unset or damaged
+   value is the order logo, sites, favorites */
++ (NSArray *)homeOrder;
++ (void)setHomeOrder:(NSArray *)order;
 + (YZMascot)mascot;
 + (void)setMascot:(YZMascot)mascot;
 + (YZThemeKind)theme;
@@ -125,6 +131,23 @@ extern NSString *const YZSettingsDidChangeNotification;
 + (BOOL)jit;
 /* tiles painted by the gpu on arm64 from ios 11, on by default, applies at once */
 + (BOOL)metal;
+/* what the start page shows: the picture of the logo, the line under it (its text can be the person's own), the search line and the tiles of the
+   visited sites. all on by default */
++ (BOOL)homeShows:(int)part;
++ (void)setHome:(int)part shown:(BOOL)shown;
++ (NSString *)homeName;
+/* addresses of the start page put in order by hand, the recent sites and the favorites, and the recent sites taken off the page. lists of strings,
+   at most YOZORA_HOME_LIST_MAX, a stored value of another type reads as empty */
++ (NSArray *)homeSiteOrder;
++ (void)setHomeSiteOrder:(NSArray *)urls;
++ (NSArray *)homeFavoriteOrder;
++ (void)setHomeFavoriteOrder:(NSArray *)urls;
++ (NSArray *)homeHiddenSites;
++ (void)hideHomeSite:(NSString *)url;
+/* the modern design paints the start page with a gradient of the accent color when no photo stands behind it */
++ (BOOL)homeGradient;
++ (void)setHomeGradient:(BOOL)enabled;
++ (void)setHomeName:(NSString *)name;
 + (void)setMetal:(BOOL)enabled;
 + (void)setJit:(BOOL)enabled;
 /* the person has answered the question about the jit, or set the switch */
