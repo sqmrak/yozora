@@ -60,12 +60,8 @@ indexeddb runs on a thread of its own in the process, its databases go with the 
 
 ## c code of the app
 
-`core/yozora_blur.c` is the blur of the start page photo, plain c with a host test (`tests/test_blur.c`). it is compiled into the app and is not part of `libYozoraCore`.
+`core/yozora_blur.c` is the lightness of the start page photo, plain c with a host test (`tests/test_blur.c`). it is compiled into the app and is not part of `libYozoraCore`. the blur it held went with the blur of the photo.
 
-- `yozora_blur_radius(percent, long_side)`: the radius in pixels for a setting of 0 to 100 (held to the range): 5 percent of the long side at 100, so 48 pixels on a photo of 960 pixels, never over 4096
-- `yozora_blur_shrink(radius)` and `yozora_blur_work_radius(radius, shrink)`: the photo is shrunk by this divisor before it is blurred so the box of a pass stays at 8 pixels or less (`YOZORA_BLUR_WORK_RADIUS`), and a blur that was asked for keeps a radius of at least 1 on the shrunk picture
-- `yozora_blur_rgba(pixels, width, height, stride, radius, scratch, capacity)`: three passes of a box in each direction over 4 channel 8 bit pixels in place, which is close to a gaussian of the same sigma. the edge pixels repeat past the picture, a flat picture stays flat, the padding of a row is not touched. the scratch is one line of the longer side (`yozora_blur_scratch_size`). the status tells an invalid size, stride or radius (`YOZORA_BLUR_INVALID`) from a short scratch (`YOZORA_BLUR_SCRATCH`)
 - `yozora_luma_average(pixels, width, height, stride)`: the mean lightness, 0 to 255, of 4 channel 8 bit pixels (weights 77, 150 and 29 over 256, alpha not read), 0 for an empty size or a short stride. `YZBackground lightnessOfImage:` feeds it a copy of 16 by 16 pixels
-- the app side is `YZBackground imageBlurredBy:` (`app/YZBackground.m`): it draws the stored photo into a bitmap of the shrunk size, blurs it and keeps the result for the stamp and the percent, so the start page and the settings screen share it. a blur that cannot be made is logged and the photo is shown as it is
 
 `core/yozora_divdc3.c` is the division of complex doubles for arm64, see [build](build.md).

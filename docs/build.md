@@ -115,5 +115,5 @@ building it:
 
 some of the c code is used by the app only and is compiled with it (`meow.toml`, the lists of `app`, `app-armv7`, `app-arm64`) instead of into `libYozoraCore`, which needs a webkit build:
 
-- `core/yozora_blur.c`: the blur of the start page photo, see [core](core.md) and [ui](ui.md)
+- `core/yozora_blur.c`: the lightness of the start page photo, see [core](core.md) and [ui](ui.md)
 - `core/yozora_divdc3.c`: `___divdc3` of compiler-rt (division of complex doubles). libSystem exports it for armv7 only (`libSystem.B.tbd` lists it for `armv7-ios` and `armv7s-ios`), the toolchain has no libclang_rt for ios, and the web audio filters of WebCore (`Biquad`, `IIRFilter`) divide complex numbers, so an arm64 link failed with `Undefined symbols: ___divdc3`. it is also a source of the `yozora-page` probe in `core/WebCoreIOSProbe.cmake`. the file is empty on armv7. `tests/test_divdc3.c` (`meow test test-divdc3`) checks it against the compiler's division for finite values and against the answers of compiler-rt for nan, infinity and zero; the file gave the same bits as `compiler-rt/lib/builtins/divdc3.c` of llvm 23.1.1 on 528561 inputs, all combinations of nan, infinity and zero among them

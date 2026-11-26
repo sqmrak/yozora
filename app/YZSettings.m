@@ -25,7 +25,6 @@ static NSString *const YZDesignKey = @"YZDesign";
 static NSString *const YZBarLayoutKey = @"YZBarLayout";
 static NSString *const YZMascotGlowKey = @"YZMascotGlow";
 static NSString *const YZDnsServerKey = @"YZDnsServer";
-static NSString *const YZHomeBackgroundBlurKey = @"YZHomeBackgroundBlur";
 static NSString *const YZHomeBackgroundStampKey = @"YZHomeBackgroundStamp";
 static NSString *const YZWebFontsKey = @"YZWebFonts";
 static NSString *const YZTranslateTargetKey = @"YZTranslateTarget";
@@ -206,10 +205,6 @@ static NSInteger YZDesignCurrent = -1;
 // the bottom bar always leaves on a long scroll down, this adds the address bar to it. off until asked for: a
 // page that grows under the finger is not what every person wants
 
-+ (NSInteger)homeBackgroundBlur {
-    return MIN((NSInteger)100, MAX((NSInteger)0, [self integerForKey:YZHomeBackgroundBlurKey defaultValue:40]));
-}
-+ (void)setHomeBackgroundBlur:(NSInteger)percent { [self storeInteger:MIN((NSInteger)100, MAX((NSInteger)0, percent)) forKey:YZHomeBackgroundBlurKey]; }
 + (NSInteger)homeBackgroundStamp { return [self integerForKey:YZHomeBackgroundStampKey defaultValue:0]; }
 + (void)noteHomeBackgroundChanged:(BOOL)present {
     // seconds are not enough when two pictures are stored in one second, the stamp only has to differ from the last one

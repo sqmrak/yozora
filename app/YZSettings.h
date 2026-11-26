@@ -84,10 +84,8 @@ extern NSString *const YZSettingsDidChangeNotification;
 /* pages are asked for fewer animations and run them at 30 frames a second, on by default for phones under a gigabyte */
 + (BOOL)reduceMotion;
 /* the soft glow of the accent behind the mascot on the start page and in the preview of the mascots, on until it is turned off */
-/* the picture behind the start page: how much it is blurred, 0 to 100 percent (see yozora_blur_radius), and the stamp of the stored file
-   (0 without a file, the time it was stored otherwise: a changed stamp is what makes the screens take the new picture) */
-+ (NSInteger)homeBackgroundBlur;
-+ (void)setHomeBackgroundBlur:(NSInteger)percent;
+/* the stamp of the picture behind the start page (0 without a file, the time it was stored otherwise: a changed stamp is what makes the screens
+   take the new picture) */
 + (NSInteger)homeBackgroundStamp;
 + (void)noteHomeBackgroundChanged:(BOOL)present;
 + (BOOL)mascotGlow;

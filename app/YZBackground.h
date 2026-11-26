@@ -4,9 +4,6 @@
 @interface YZBackground : NSObject
 /* the stored picture, nil without one */
 + (UIImage *)image;
-/* the stored picture blurred by percent (0 to 100, `yozora_blur_radius`), the picture itself at 0 or when the blur could not be made (logged). the last
-   result is kept for the same stamp and percent, so the start page and the settings screen share it */
-+ (UIImage *)imageBlurredBy:(NSInteger)percent;
 /* the mean lightness of the picture, 0 (black) to 1 (white), taken from a copy of 16 by 16 pixels. a picture that cannot be read counts as dark and is logged */
 + (CGFloat)lightnessOfImage:(UIImage *)picture;
 /* stores the picture, scaled so its long side is at most the long side of this device's screen in pixels, as a jpeg. NO when it could not be written */

@@ -25,62 +25,6 @@ static NSString *YZBackgroundPath(void) {
     return YZCachedPicture;
 }
 
-static UIImage *YZCachedBlur;
-static NSInteger YZCachedBlurStamp = -1;
-static NSInteger YZCachedBlurPercent = -1;
-
-// the picture is shrunk first so the box of a pass stays small, the layer scales the smooth result back up. a low blur keeps the full size
-+ (UIImage *)imageBlurredBy:(NSInteger)percent {
-    UIImage *picture = [self image];
-    if (!picture || percent <= 0 || !picture.CGImage)
-        return picture;
-    NSInteger stamp = [YZSettings homeBackgroundStamp];
-    if (YZCachedBlur && YZCachedBlurStamp == stamp && YZCachedBlurPercent == percent)
-        return YZCachedBlur;
-    size_t sourceWidth = CGImageGetWidth(picture.CGImage), sourceHeight = CGImageGetHeight(picture.CGImage);
-    uint32_t radius = yozora_blur_radius((int)percent, (uint32_t)MAX(sourceWidth, sourceHeight));
-    uint32_t shrink = yozora_blur_shrink(radius);
-    size_t width = MAX((size_t)1, (sourceWidth + shrink - 1) / shrink), height = MAX((size_t)1, (sourceHeight + shrink - 1) / shrink);
-    size_t stride = width * 4;
-    size_t scratchSize = yozora_blur_scratch_size((uint32_t)width, (uint32_t)height);
-    uint8_t *pixels = calloc(height, stride);
-    uint8_t *scratch = malloc(scratchSize);
-    UIImage *result = nil;
-    if (pixels && scratch) {
-        CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-        CGContextRef context = CGBitmapContextCreate(pixels, width, height, 8, stride, space, kCGImageAlphaPremultipliedLast);
-        CGColorSpaceRelease(space);
-        if (context) {
-            CGContextSetInterpolationQuality(context, kCGInterpolationHigh);
-            CGContextDrawImage(context, CGRectMake(0, 0, width, height), picture.CGImage);
-            yozora_blur_status status = yozora_blur_rgba(pixels, (uint32_t)width, (uint32_t)height, stride, yozora_blur_work_radius(radius, shrink), scratch, scratchSize);
-            if (status == YOZORA_BLUR_OK) {
-                CGImageRef blurred = CGBitmapContextCreateImage(context);
-                if (blurred) {
-                    result = [UIImage imageWithCGImage:blurred];
-                    CGImageRelease(blurred);
-                }
-            } else {
-                NSLog(@"yozora: the background was not blurred, status %d", (int)status);
-            }
-            CGContextRelease(context);
-        } else {
-            NSLog(@"yozora: the background was not blurred, no bitmap of %lux%lu", (unsigned long)width, (unsigned long)height);
-        }
-    } else {
-        NSLog(@"yozora: the background was not blurred, no memory for %lux%lu", (unsigned long)width, (unsigned long)height);
-    }
-    free(pixels);
-    free(scratch);
-    if (!result)
-        return picture;
-    [YZCachedBlur release];
-    YZCachedBlur = [result retain];
-    YZCachedBlurStamp = stamp;
-    YZCachedBlurPercent = percent;
-    return result;
-}
-
 + (CGFloat)lightnessOfImage:(UIImage *)picture {
     enum { side = 16 };
     uint8_t pixels[side * side * 4];
@@ -122,7 +66,11 @@ static NSInteger YZCachedBlurPercent = -1;
         NSLog(@"yozora: the background was not written: %@", error);
         return NO;
     }
-    [YZSettings noteHomeBackgroundChanged:YES];
+    // the photo is stored away from the main thread, the stamp posts the settings notification that the screens answer with UIKit
+    if ([NSThread isMainThread])
+        [YZSettings noteHomeBackgroundChanged:YES];
+    else
+        dispatch_sync(dispatch_get_main_queue(), ^{ [YZSettings noteHomeBackgroundChanged:YES]; });
     return YES;
 }
 
