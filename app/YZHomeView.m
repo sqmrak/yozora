@@ -915,7 +915,7 @@ static const CGFloat YZPillHeight = 44;
         return top;
     }
     if (!_protectedPill) {
-        _protectedPill = [[UIView alloc] initWithFrame:CGRectZero];
+        _protectedPill = [[YZPlateView alloc] initWithFrame:CGRectZero];
         _protectedPill.layer.cornerRadius = YZPillHeight / 2;
         _protectedIcon = [[UIImageView alloc] initWithFrame:CGRectZero];
         _protectedIcon.contentMode = UIViewContentModeCenter;
@@ -928,9 +928,9 @@ static const CGFloat YZPillHeight = 44;
         [self addSubview:_protectedPill];
     }
     _protectedPill.hidden = NO;
-    _protectedPill.backgroundColor = [YZTheme cardColor];
-    UIColor *ink = [self headingInk];
-    _protectedLabel.textColor = ink;
+    [(YZPlateView *)_protectedPill applyTheme];
+    _protectedPill.layer.cornerRadius = YZPillHeight / 2;
+    _protectedLabel.textColor = [YZTheme textColor];
     _protectedIcon.image = [YZTheme icon:YZIconShield size:22 color:[YZTheme fieldAccentColor]];
     CGSize text = YZTextSize(_protectedLabel.text, _protectedLabel.font);
     CGFloat width = MIN(ceil(text.width) + 22 + 8 + 2 * 20, self.bounds.size.width - 32);
