@@ -1,0 +1,67 @@
+--- a/Source/ThirdParty/skia/CMakeLists.txt
++++ b/Source/ThirdParty/skia/CMakeLists.txt
+@@ -814,10 +814,7 @@
+ )
+ 
+ if (PORT STREQUAL "Yozora")
+-    # yozora paints into CPU raster surfaces without a GL context
+-    get_target_property(Skia_RASTER_SOURCES Skia SOURCES)
+-    list(FILTER Skia_RASTER_SOURCES EXCLUDE REGEX "^src/gpu/")
+-    set_property(TARGET Skia PROPERTY SOURCES ${Skia_RASTER_SOURCES})
++    include("${YOZORA_WEBCORE_ROOT}/../SkiaRaster.cmake")
+ endif ()
+ 
+ if (WIN32)
+--- a/Source/ThirdParty/skia/src/gpu/ganesh/ops/AtlasTextOp.cpp
++++ b/Source/ThirdParty/skia/src/gpu/ganesh/ops/AtlasTextOp.cpp
+@@ -67,27 +67,13 @@
+ inline static constexpr int kVerticesPerGlyph = 4;
+ inline static constexpr int kIndicesPerGlyph = 6;
+ 
+-// If we have thread local, then cache memory for a single AtlasTextOp.
+-static thread_local void* gCache = nullptr;
+-void* AtlasTextOp::operator new(size_t s) {
+-    if (gCache != nullptr) {
+-        return std::exchange(gCache, nullptr);
+-    }
+-
+-    return ::operator new(s);
++// ios 7 arm64 has no native thread-local storage for the per-thread allocation cache
++void* AtlasTextOp::operator new(size_t size) {
++    return ::operator new(size);
+ }
+ 
+ void AtlasTextOp::operator delete(void* bytes) noexcept {
+-    if (gCache == nullptr) {
+-        gCache = bytes;
+-        return;
+-    }
+     ::operator delete(bytes);
+-}
+-
+-void AtlasTextOp::ClearCache() {
+-    ::operator delete(gCache);
+-    gCache = nullptr;
+ }
+ 
+ namespace {
+--- a/Source/ThirdParty/skia/src/gpu/ganesh/ops/AtlasTextOp.h
++++ b/Source/ThirdParty/skia/src/gpu/ganesh/ops/AtlasTextOp.h
+@@ -75,7 +75,6 @@
+ 
+     void* operator new(size_t s);
+     void operator delete(void* b) noexcept;
+-    static void ClearCache();
+ 
+     struct Geometry {
+         Geometry(const sktext::gpu::AtlasSubRun& subRun,
+--- a/Source/ThirdParty/skia/src/gpu/ganesh/GrRecordingContext.cpp
++++ b/Source/ThirdParty/skia/src/gpu/ganesh/GrRecordingContext.cpp
+@@ -61,7 +61,6 @@
+ }
+ 
+ GrRecordingContext::~GrRecordingContext() {
+-    skgpu::ganesh::AtlasTextOp::ClearCache();
+ }
+ 
+ bool GrRecordingContext::init() {

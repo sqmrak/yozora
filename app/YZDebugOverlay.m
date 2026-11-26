@@ -5,8 +5,12 @@
 #include <sys/sysctl.h>
 #include <QuartzCore/QuartzCore.h>
 #include "yozora_debug.h"
+#include "yozora_core.h"
+#if defined(__arm64__)
+#import "../core/core/YozoraMetal.h"
+#endif
 
-static const CGFloat YZOverlayWidth = 196;
+static const CGFloat YZOverlayWidth = 236;
 static const CGFloat YZOverlayRow = 16;
 static const CGFloat YZOverlayPad = 10;
 
@@ -15,7 +19,8 @@ typedef enum {
     YZOverlayCPU,
     YZOverlayRender,
     YZOverlayMemory,
-    YZOverlayTraffic,
+    YZOverlayGPU,
+    YZOverlayJIT,
     YZOverlayRows
 } YZOverlayRow_t;
 
@@ -68,7 +73,7 @@ static NSString *YZMachineIdentifier(void) {
 @synthesize site = _site;
 
 + (CGSize)preferredSize {
-    // five numbers, the phone and the site, between two pads
+    // six numbers, the phone and the site, between two pads
     return CGSizeMake(YZOverlayWidth, YZOverlayPad * 2 + YZOverlayRow * (YZOverlayRows + 2) + 6);
 }
 
@@ -94,7 +99,7 @@ static NSString *YZMachineIdentifier(void) {
     self.layer.borderColor = [[UIColor colorWithWhite:1 alpha:0.12f] CGColor];
     _keys = [[NSMutableArray alloc] init];
     _values = [[NSMutableArray alloc] init];
-    static NSString *const names[] = { @"FPS", @"CPU", @"RENDER", @"MEM", @"NET" };
+    static NSString *const names[] = { @"FPS", @"CPU", @"RENDER", @"MEM", @"GPU", @"JIT" };
     for (int i = 0; i < YZOverlayRows; ++i) {
         UILabel *key = [self labelWithColor:[UIColor colorWithWhite:1 alpha:0.5f] align:YZTextAlignmentLeft];
         key.text = names[i];
@@ -166,6 +171,44 @@ static NSString *YZMachineIdentifier(void) {
     label.textColor = color;
 }
 
+// tiles of the pages: Metal on arm64 from ios 11, the cpu elsewhere or when Metal is off or refused
+- (void)refreshGPU {
+#if defined(__arm64__)
+    yozora_metal_info info;
+    yozora_metal_info_read(&info);
+    char held[16];
+    yozora_format_bytes(info.surface_bytes, held, sizeof held);
+    switch (info.state) {
+    case 1:
+        [self setValue:YZOverlayGPU text:[NSString stringWithFormat:@"Metal %llu  cpu %llu  %s", info.tiles, info.fallbacks, held]
+                 color:info.fallbacks * 10 > info.tiles ? YZWarn() : YZGood()];
+        return;
+    case 2:
+        [self setValue:YZOverlayGPU text:@"Metal refused, cpu" color:YZBad()];
+        return;
+    case 3:
+        [self setValue:YZOverlayGPU text:@"Metal waits for a page" color:[UIColor whiteColor]];
+        return;
+    default:
+        break;
+    }
+#endif
+    [self setValue:YZOverlayGPU text:@"cpu raster" color:[UIColor whiteColor]];
+}
+
+// the tiers JavaScriptCore runs after it started and the code memory in use
+- (void)refreshJIT {
+    yozora_jit_info jit;
+    yozora_jit_info_read(&jit);
+    if (!jit.compiled || !jit.active) {
+        [self setValue:YZOverlayJIT text:@"off, interpreter" color:jit.requested ? YZBad() : [UIColor whiteColor]];
+        return;
+    }
+    char used[16];
+    yozora_format_bytes(jit.pool_used, used, sizeof used);
+    [self setValue:YZOverlayJIT text:[NSString stringWithFormat:@"base%s%s%s  %s", jit.dfg ? " dfg" : "", jit.ftl ? " ftl" : "", jit.regexp ? " re" : "", used] color:YZGood()];
+}
+
 - (void)refreshWithCore:(yozora_core *)core {
     CFTimeInterval now = CACurrentMediaTime();
     double elapsed = now - _windowStart;
@@ -205,19 +248,8 @@ static NSString *YZMachineIdentifier(void) {
     double use = device.memory_mb ? resident / (device.memory_mb * 1048576.0) : 0;
     [self setValue:YZOverlayMemory text:[NSString stringWithFormat:@"%s  %.0f%%", size, use * 100] color:use < 0.35 ? YZGood() : (use < 0.55 ? YZWarn() : YZBad())];
 
-    unsigned long long received, sent;
-    yozora_traffic_read(&received, &sent);
-    if (_previousReceived || _previousSent) {
-        _receiveRate = (received - _previousReceived) / elapsed;
-        _sendRate = (sent - _previousSent) / elapsed;
-    }
-    _previousReceived = received;
-    _previousSent = sent;
-    char down[16], up[16], rate[16];
-    yozora_format_bytes(received, down, sizeof down);
-    yozora_format_bytes(sent, up, sizeof up);
-    yozora_format_bytes((unsigned long long)_receiveRate, rate, sizeof rate);
-    [self setValue:YZOverlayTraffic text:[NSString stringWithFormat:@"↓%s ↑%s  %s/s", down, up, rate] color:[UIColor whiteColor]];
+    [self refreshGPU];
+    [self refreshJIT];
 
     // the dot blinks once for every reading
     _dot.alpha = 1;

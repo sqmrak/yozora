@@ -7,11 +7,13 @@
 3. the raster thread (`YozoraRaster.cpp`) paints tiles from it, reuses tiles that did not change and clips a partial repaint to separate damage rectangles
 4. the interface consumes the scene (`YZSceneView.m`) as a tree of native core animation layers
 
-painting is done by the processor. there is no gpu rasterizer and no gpu line in the debug card, the system has no public reading of the graphics chip.
+on arm64 from ios 11, helpers record ganesh deferred display lists. one serial queue plays them into bgra metal textures backed by iosurface. a compute pass reduces tile alpha to two flags for empty and opaque tiles. the interface receives the surface after completion and assigns it to the tile layer. damage can borrow the previous tile as a texture. snapshots read finished surfaces on demand.
+
+armv7, earlier arm64 systems and the host paint into cpu surfaces. the app closes the metal queue on entering the background. a tile that exceeds the texture budget or fails on metal is painted on the cpu.
 
 ## raster
 
-- one helper thread besides the one that owns the pass: two threads on a phone with two cores or more, one on a single core, `YOZORA_RASTER_THREADS` (1 to 4) overrides
+- one to four painting threads according to the number of cores, `YOZORA_RASTER_THREADS` (1 to 4) overrides
 - the tiles of a layer go to both threads, the pass waits only after a layer that can cover what lies under it, so occlusion and the order of the tiles are what one thread gives
 - tiles are up to 256 by 128 points, edge tiles use their real size
 - a queue holds one pending scene, a mutation replaces it while the frame in flight finishes, so nothing starves
@@ -31,6 +33,8 @@ the raster cache and the layer pixels of each scene have separate limits:
 - otherwise 6 percent of the memory, from 48 up to 512 MB: 122 MB at 2 GB, 245 MB at 4 GB
 
 the constrained tier (400 to 512 MB) also takes smaller caches elsewhere, see [performance](performance.md). the cache and four scenes can each reach it, so the worst case stays near a third of the memory, and a memory warning drops all of it. the arithmetic is `core/yozora_budget.c`.
+
+the process-wide metal pool counts the allocated size of each iosurface, including row alignment. three quarters of the raster budget go to surfaces, one quarter to the ganesh resource cache. a memory warning drops idle surfaces and releases ganesh scratch resources in the foreground.
 
 the limit only decides how far beyond the screen tiles are made. every tile on screen is made whatever the budget: no page fails for its size or its number of layers, and a layer whose transform leaves no area for a tile grid goes without pixels while the rest of the page is shown.
 

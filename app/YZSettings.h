@@ -116,6 +116,9 @@ extern NSString *const YZSettingsDidChangeNotification;
 + (void)setUnlockAllDesigns:(BOOL)enabled;
 + (void)setZombies:(BOOL)enabled;
 + (BOOL)jit;
+/* tiles painted by the gpu on arm64 from ios 11, on by default, applies at once */
++ (BOOL)metal;
++ (void)setMetal:(BOOL)enabled;
 + (void)setJit:(BOOL)enabled;
 /* the person has answered the question about the jit, or set the switch */
 + (BOOL)jitAnswered;

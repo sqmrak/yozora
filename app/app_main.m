@@ -1,3 +1,6 @@
+#if defined(__arm64__)
+#import "../core/core/YozoraMetal.h"
+#endif
 #import <UIKit/UIKit.h>
 #import "YZBrowserController.h"
 #import "YZCrash.h"
@@ -103,8 +106,22 @@ static void YZDownloadObserver(unsigned identifier, int state, void *context);
     _pendingURL = [url retain];
     return YES;
 }
+#if defined(__arm64__)
+- (void)applicationDidBecomeActive:(UIApplication *)application {
+    (void)application;
+    yozora_metal_set_allowed([YZSettings metal]);
+}
+
+- (void)applicationDidReceiveMemoryWarning:(UIApplication *)application {
+    (void)application;
+    yozora_metal_trim();
+}
+#endif
 - (void)applicationDidEnterBackground:(UIApplication *)application {
     (void)application;
+#if defined(__arm64__)
+    yozora_metal_set_allowed(0);
+#endif
     [YZCrash applicationDidEnterBackground];
     [_browser saveTabsAndWait];
     [self flushCachesInBackground:application];
@@ -121,6 +138,9 @@ static void YZDownloadObserver(unsigned identifier, int state, void *context);
 - (void)applicationWillEnterForeground:(UIApplication *)application {
     (void)application;
     // the graphics chip is the app's again before the core thread may run a page
+#if defined(__arm64__)
+    yozora_metal_set_allowed([YZSettings metal]);
+#endif
     yozora_gl_set_allowed(1);
     [YZCrash applicationWillEnterForeground];
     [self endBackgroundTask];

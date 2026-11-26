@@ -1,8 +1,8 @@
 #import <UIKit/UIKit.h>
 #include "yozora_core.h"
 
-/* process numbers in a corner for the debug setting, every number is measured, no gpu line because the system
-   has no public reading */
+/* process numbers in a corner for the debug setting, every number is measured. the GPU line is what the core counts
+   (Metal tiles and the tiles that went to the cpu), the system has no public reading of the load of the chip */
 @interface YZDebugOverlay : UIView {
     NSMutableArray *_keys;
     NSMutableArray *_values;
@@ -18,10 +18,6 @@
     double _sceneRate;
     long long _cpuWindowMicros;
     long long _previousPaintMs;
-    unsigned long long _previousReceived;
-    unsigned long long _previousSent;
-    double _receiveRate;
-    double _sendRate;
 }
 /* the host of the page on screen, nil for none */
 @property(nonatomic, copy) NSString *site;

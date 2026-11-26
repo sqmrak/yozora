@@ -1,5 +1,9 @@
 #include "config.h"
 #include "YozoraRaster.h"
+#include "yozora_budget.h"
+#if defined(__APPLE__) && defined(__arm64__)
+#include "YozoraMetal.h"
+#endif
 
 #include <skia/core/SkCanvas.h>
 #include <skia/core/SkImage.h>
@@ -116,7 +120,20 @@ struct CachedTile {
     size_t bytes { emptyTileCost };
     // every pixel has full alpha, so what lies under the tile cannot show
     bool opaque { false };
+    void* surface { nullptr };
 };
+
+bool tileView(yozora_scene_tile& view, const CachedTile& tile, int x, int y, float scale)
+{
+    SkPixmap pixels;
+    if (!tile.image || (!tile.surface && !tile.image->peekPixels(&pixels)))
+        return false;
+    view = { static_cast<const uint8_t*>(pixels.addr()), pixels.rowBytes(),
+        static_cast<unsigned>(tile.image->width()), static_cast<unsigned>(tile.image->height()),
+        static_cast<float>(x * tileWidth), static_cast<float>(y * tileHeight), scale,
+        reinterpret_cast<yozora_image*>(tile.image.get()), tile.surface };
+    return true;
+}
 
 struct TileScan {
     bool empty { true };
@@ -203,6 +220,7 @@ struct TileJob {
     sk_sp<SkPicture> picture;
     // the tile of an earlier version of the layer and what changed since, so only the damage is painted again
     sk_sp<SkImage> previous;
+    void* previous_surface { nullptr };
     yozora_damage changes { };
     float scale { 1 };
     int x { 0 }, y { 0 };
@@ -210,6 +228,8 @@ struct TileJob {
     sk_sp<SkImage> image;
     bool empty { true };
     bool opaque { false };
+    void* surface { nullptr };
+    size_t budget { 0 };
     bool failed { false };
     // read and written under the lock of the pool
     bool done { false };
@@ -227,18 +247,12 @@ static long tileDelayMicroseconds()
     return value;
 }
 
-void paintTile(TileJob& job)
+void drawTile(SkCanvas& canvas, SkImage* previous, void* argument)
 {
-    if (long delay = tileDelayMicroseconds())
-        usleep(static_cast<useconds_t>(delay));
-    auto surface = SkSurfaces::Raster(SkImageInfo::Make(job.width, job.height, kBGRA_8888_SkColorType, kPremul_SkAlphaType));
-    if (!surface) {
-        job.failed = true;
-        return;
-    }
-    auto& canvas = *surface->getCanvas();
-    if (job.previous) {
-        canvas.drawImage(job.previous, 0, 0);
+    auto& job = *static_cast<TileJob*>(argument);
+    canvas.clear(SK_ColorTRANSPARENT);
+    if (previous) {
+        canvas.drawImage(previous, 0, 0);
         SkRegion changed;
         for (unsigned j = 0; j < job.changes.count; ++j) {
             auto rect = job.changes.rects[j];
@@ -251,11 +265,39 @@ void paintTile(TileJob& job)
         canvas.clipRegion(changed);
         canvas.clear(SK_ColorTRANSPARENT);
     }
-    // SkSurfaces::Raster allocates zeroed pixels, only reused content needs clearing
     canvas.scale(job.scale, job.scale);
     canvas.translate(-job.x * tileWidth, -job.y * tileHeight);
     canvas.drawPicture(job.picture);
+}
+
+void paintTile(TileJob& job)
+{
+    if (long delay = tileDelayMicroseconds())
+        usleep(static_cast<useconds_t>(delay));
+#if defined(__APPLE__) && defined(__arm64__)
+    job.image = yozora_metal_tile(job.width, job.height, job.budget, job.previous.get(), job.previous_surface, drawTile, &job, &job.surface, &job.empty, &job.opaque);
+    if (job.image) {
+        if (job.empty) {
+            job.image.reset();
+            job.surface = nullptr;
+        }
+        return;
+    }
+#endif
+    auto surface = SkSurfaces::Raster(SkImageInfo::Make(job.width, job.height, kBGRA_8888_SkColorType, kPremul_SkAlphaType));
+    if (!surface) {
+        job.failed = true;
+        return;
+    }
+    auto previous = job.previous;
+    if (job.previous_surface)
+        previous = previous->makeRasterImage(nullptr);
+    drawTile(*surface->getCanvas(), previous.get(), &job);
     job.image = surface->makeImageSnapshot();
+    if (!job.image) {
+        job.failed = true;
+        return;
+    }
     SkPixmap drawn;
     TileScan scanned;
     if (job.image && job.image->peekPixels(&drawn))
@@ -369,9 +411,8 @@ private:
     bool m_stopping { false };
 };
 
-// the threads that paint tiles in all: YOZORA_RASTER_THREADS (1 to 4), otherwise two on a phone with two
-// cores or more and one on a single core. YOZORA_DEVICE_CORES stands in for the core count as it does for the
-// rest of the core
+// the threads that paint tiles in all: YOZORA_RASTER_THREADS (1 to 4), otherwise by the cores (yozora_raster_threads_for: one, two, three or four).
+// YOZORA_DEVICE_CORES stands in for the core count as it does for the rest of the core
 unsigned defaultRasterThreads()
 {
     if (const char* text = std::getenv("YOZORA_RASTER_THREADS")) {
@@ -385,7 +426,7 @@ unsigned defaultRasterThreads()
         if (value >= 1 && value <= 64)
             cores = value;
     }
-    return cores >= 2 ? 2 : 1;
+    return yozora_raster_threads_for(cores > 0 ? static_cast<unsigned>(cores) : 1);
 }
 
 // one pool for the process so many tabs do not multiply helpers. never destroyed, its threads sleep until the
@@ -724,20 +765,17 @@ struct Raster::State {
                 }
                 size_t cost = job.empty ? emptyTileCost : entry.charge;
                 trim(cost);
-                cache.emplace(entry.key, CachedTile { job.empty ? nullptr : job.image, ++sequence, entry.coverage, cost, job.opaque });
+                auto cached = cache.emplace(entry.key, CachedTile { job.empty ? nullptr : job.image, ++sequence, entry.coverage, cost, job.opaque, job.surface });
                 cache_bytes += cost;
                 if (job.empty) {
                     pixel_bytes -= entry.charge;
                     continue;
                 }
-                SkPixmap pixels;
-                if (!job.image || !job.image->peekPixels(&pixels)) {
+                if (!tileView(result->tile_views[entry.layer][entry.slot], cached.first->second, job.x, job.y, job.scale)) {
                     result->error = "Cannot read page raster tile";
                     ok = false;
                     break;
                 }
-                result->tile_views[entry.layer][entry.slot] = { static_cast<const uint8_t*>(pixels.addr()), pixels.rowBytes(), job.width, job.height,
-                    static_cast<float>(job.x * tileWidth), static_cast<float>(job.y * tileHeight), job.scale, reinterpret_cast<yozora_image*>(job.image.get()) };
                 result->images.push_back(job.image);
                 if (entry.covers && job.opaque)
                     cover(*entry.plan, entry.on_screen);
@@ -813,10 +851,13 @@ struct Raster::State {
                         auto low = cache.find(low_key);
                         if (low != cache.end()) {
                             low->second.used = ++sequence;
-                            SkPixmap low_pixels;
-                            if (low->second.image && low->second.image->peekPixels(&low_pixels)) {
-                                result->tile_views[i].push_back({ static_cast<const uint8_t*>(low_pixels.addr()), low_pixels.rowBytes(), low_width, low_height,
-                                    static_cast<float>(x * tileWidth), static_cast<float>(y * tileHeight), low_scale, reinterpret_cast<yozora_image*>(low->second.image.get()) });
+                            if (low->second.image) {
+                                yozora_scene_tile view;
+                                if (!tileView(view, low->second, x, y, low_scale)) {
+                                    result->error = "Cannot read low resolution tile";
+                                    return result;
+                                }
+                                result->tile_views[i].push_back(view);
                                 result->images.push_back(low->second.image);
                                 pixel_bytes += low_charge;
                                 // only tiles on screen ask for the crisp pass that follows, the ones ahead wait until they come into view
@@ -832,6 +873,7 @@ struct Raster::State {
                         low_job->scale = low_scale;
                         low_job->x = x;
                         low_job->y = y;
+                        low_job->budget = byte_limit;
                         low_job->width = low_width;
                         low_job->height = low_height;
                         if (pool && pool->helpers())
@@ -849,6 +891,7 @@ struct Raster::State {
                         continue;
                     }
                     sk_sp<SkImage> previous_image;
+                    void* previous_surface = nullptr;
                     yozora_damage changes { };
                     if (found == cache.end() && !recorded.changes.empty()) {
                         uint64_t first_version = recorded.changes.front().version;
@@ -878,6 +921,7 @@ struct Raster::State {
                             }
                             if (!damage.full) {
                                 previous_image = old->second.image;
+                                previous_surface = old->second.surface;
                                 changes = damage;
                             }
                         }
@@ -898,10 +942,12 @@ struct Raster::State {
                         auto job = std::make_shared<TileJob>();
                         job->picture = recorded.picture;
                         job->previous = previous_image;
+                        job->previous_surface = previous_surface;
                         job->changes = changes;
                         job->scale = source.scale;
                         job->x = x;
                         job->y = y;
+                        job->budget = byte_limit;
                         job->width = width;
                         job->height = height;
                         if (pool && pool->helpers())
@@ -925,13 +971,12 @@ struct Raster::State {
                         continue;
                     }
                     pixel_bytes += charge;
-                    SkPixmap pixels;
-                    if (!image || !image->peekPixels(&pixels)) {
+                    yozora_scene_tile view;
+                    if (!tileView(view, found->second, x, y, source.scale)) {
                         result->error = "Cannot read page raster tile";
                         return result;
                     }
-                    result->tile_views[i].push_back({ static_cast<const uint8_t*>(pixels.addr()), pixels.rowBytes(), width, height,
-                        static_cast<float>(x * tileWidth), static_cast<float>(y * tileHeight), source.scale, reinterpret_cast<yozora_image*>(image.get()) });
+                    result->tile_views[i].push_back(view);
                     result->images.push_back(std::move(image));
                     if (plan.solid && exact && tile_opaque)
                         cover(plan, tile_on_screen);
@@ -947,7 +992,7 @@ struct Raster::State {
         if (!collect())
             return result;
         for (auto& views : result->tile_views)
-            std::erase_if(views, [](const yozora_scene_tile& tile) { return !tile.pixels; });
+            std::erase_if(views, [](const yozora_scene_tile& tile) { return !tile.image; });
         for (size_t i = 0; i < result->layers.size(); ++i) {
             result->layers[i].tiles = result->tile_views[i].data();
             result->layers[i].tile_count = result->tile_views[i].size();
@@ -957,10 +1002,10 @@ struct Raster::State {
         return result;
     }
 
-    void drawLayer(SkCanvas& canvas, const yozora_scene& scene, size_t index)
+    void drawLayer(SkCanvas& canvas, yozora_scene& scene, size_t index)
     {
         const auto& layer = scene.layers[index];
-        if (layer.opacity <= 0)
+        if (layer.opacity <= 0 || !scene.error.empty())
             return;
         canvas.save();
         canvas.concat(layerMatrix(layer));
@@ -976,12 +1021,14 @@ struct Raster::State {
         }
         for (unsigned i = 0; !layer.hidden && i < layer.tile_count; ++i) {
             auto& tile = layer.tiles[i];
-            auto found = std::find_if(scene.images.begin(), scene.images.end(), [&](auto& image) {
-                SkPixmap pixels;
-                return image->peekPixels(&pixels) && pixels.addr() == tile.pixels;
-            });
-            if (found != scene.images.end())
-                canvas.drawImageRect(*found, SkRect::MakeXYWH(tile.x, tile.y, tile.width / tile.scale, tile.height / tile.scale), SkSamplingOptions());
+            auto image = sk_ref_sp(reinterpret_cast<SkImage*>(tile.image));
+            if (tile.surface)
+                image = image->makeRasterImage(nullptr, SkImage::kAllow_CachingHint);
+            if (!image) {
+                scene.error = "Cannot read page snapshot tile";
+                break;
+            }
+            canvas.drawImageRect(image, SkRect::MakeXYWH(tile.x, tile.y, tile.width / tile.scale, tile.height / tile.scale), SkSamplingOptions());
         }
         canvas.save();
         canvas.concat(matrix(layer.children_transform));
@@ -1025,6 +1072,10 @@ struct Raster::State {
             for (size_t i = 0; i < output.layers.size(); ++i) {
                 if (!output.layers[i].parent)
                     drawLayer(canvas, output, i);
+            }
+            if (!output.error.empty()) {
+                output.frame.clear();
+                return;
             }
             output.frame.push_back(std::move(surface));
         }

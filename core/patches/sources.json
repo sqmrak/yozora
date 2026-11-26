@@ -737,5 +737,27 @@
       "before": "6f242db973bc241f76506b36118b5e28473549db52ba0f1612a38f844355f304",
       "after": "5cebabd43a5622ea26f9d2c7df1a7d126abc351a8b769a5f3af697b14debbda7"
     }
+  ],
+  "webkit-yozora-metal": [
+    {
+      "path": "Source/ThirdParty/skia/CMakeLists.txt",
+      "before": "ad7f3a6d83565c5af6b161f952732ccf33506b1c37882780df70f8993ad15ee6",
+      "after": "aa88e41bfeb79d4fdb1c38776316b647dde58a3aabaa21b5380ebaf0e3a2c4d5"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/ops/AtlasTextOp.cpp",
+      "before": "709c8b11ce45a80016b28a0512ec5111e3bc6dee85d7f4b1ee95267b61dfbef0",
+      "after": "2ddc4a51f7863130ddddcfc792b840984bf259b8be2e6d85cbdbca035e30e812"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/ops/AtlasTextOp.h",
+      "before": "a99817c5357930994eaa835890c943132307684557583c850bdb0fe69e860900",
+      "after": "74a40eca68d216bedcb9e4a01c8d126ba2cf344eb8ce6c72e8f510c122c0416a"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/GrRecordingContext.cpp",
+      "before": "525e8642051ce7020c27eb27074b6920f15352c8e0e8d3616b82fb090218f589",
+      "after": "08fcf31ad21849fccc6a00836bd25347016cf0815e74793d23a4165bb43d9f65"
+    }
   ]
 }

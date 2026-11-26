@@ -260,6 +260,7 @@ static NSDictionary *YZEnglish(void) {
         @"The blocker is on for this site", @"Блокировщик включён на этом сайте",
         @"Errors", @"Ошибки",
         @"JIT state", @"Состояние JIT",
+        @"The graphics chip paints page tiles. Turn it off if they flicker or do not update", @"Плитки страниц рисует видеочип, выключите, если они мигают или не обновляются",
         @"Load, memory, traffic and fps in a corner of the screen", @"Нагрузка, память, трафик и fps в углу экрана",
         @"Keep the log of the app and of pages", @"Копить журнал приложения и страниц",
         @"A terminal with the records, capture is on", @"Терминал с записями, захват идёт",

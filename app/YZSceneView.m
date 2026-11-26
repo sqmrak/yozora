@@ -214,23 +214,26 @@ static void YZSceneReleasePixels(void *context, const void *data, size_t size) {
                     picture.bounds = bounds;
                 if (picture.contentsScale != tile->scale)
                     picture.contentsScale = tile->scale;
-                if (previous && [previous pointerValue] == tile->pixels)
+                if (previous && [previous pointerValue] == (tile->surface ? tile->surface : (void *)tile->image))
                     continue;
             }
             // unchanged tiles keep only their own pixels alive while other layers animate
-            yozora_image_retain(tile->image);
-            CGDataProviderRef provider = CGDataProviderCreateWithData(tile->image, tile->pixels, tile->row_bytes * tile->height, YZSceneReleasePixels);
-            if (!provider) {
-                yozora_image_release(tile->image);
-                NSLog(@"yozora: cannot allocate scene image provider");
-                continue;
-            }
-            CGImageRef image = CGImageCreate(tile->width, tile->height, 8, 32, tile->row_bytes, space,
-                kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst, provider, NULL, NO, kCGRenderingIntentDefault);
-            CGDataProviderRelease(provider);
-            if (!image) {
-                NSLog(@"yozora: cannot allocate scene image");
-                continue;
+            CGImageRef image = NULL;
+            if (!tile->surface) {
+                yozora_image_retain(tile->image);
+                CGDataProviderRef provider = CGDataProviderCreateWithData(tile->image, tile->pixels, tile->row_bytes * tile->height, YZSceneReleasePixels);
+                if (!provider) {
+                    yozora_image_release(tile->image);
+                    NSLog(@"yozora: cannot allocate scene image provider");
+                    continue;
+                }
+                image = CGImageCreate(tile->width, tile->height, 8, 32, tile->row_bytes, space,
+                    kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst, provider, NULL, NO, kCGRenderingIntentDefault);
+                CGDataProviderRelease(provider);
+                if (!image) {
+                    NSLog(@"yozora: cannot allocate scene image");
+                    continue;
+                }
             }
             if (!picture) {
                 picture = [CALayer layer];
@@ -241,9 +244,10 @@ static void YZSceneReleasePixels(void *context, const void *data, size_t size) {
             picture.position = CGPointMake(tile->x, tile->y);
             picture.bounds = CGRectMake(0, 0, tile->width / tile->scale, tile->height / tile->scale);
             picture.contentsScale = tile->scale;
-            picture.contents = (id)image;
-            [node->pixels setObject:[NSValue valueWithPointer:tile->pixels] forKey:tileKey];
-            CGImageRelease(image);
+            picture.contents = tile->surface ? (id)tile->surface : (id)image;
+            [node->pixels setObject:[NSValue valueWithPointer:(tile->surface ? tile->surface : (void *)tile->image)] forKey:tileKey];
+            if (image)
+                CGImageRelease(image);
         }
         for (NSNumber *tileKey in [node->tiles allKeys]) {
             if (![tileKeys containsObject:tileKey]) {

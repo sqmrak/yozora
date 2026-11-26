@@ -46,6 +46,12 @@ function(yozora_add_core)
         "${yozora_root}/core/yozora_keys.c"
         "${yozora_root}/core/yozora_motion.c"
         "${yozora_root}/core/yozora_zoom.c" "${yozora_root}/core/yozora_debug.c" "${yozora_root}/core/yozora_translate.c" "${yozora_root}/core/yozora_transfer.c" "${yozora_root}/core/yozora_color.c" "${yozora_root}/core/yozora_render_plan.c" "${yozora_root}/core/yozora_signin.c")
+    if (CMAKE_SYSTEM_NAME STREQUAL "iOS" AND CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
+        target_sources(YozoraCore PRIVATE "${yozora_root}/core/core/YozoraMetal.mm")
+        target_include_directories(YozoraCore PRIVATE "${CMAKE_SOURCE_DIR}/Source/ThirdParty/skia")
+        set_source_files_properties("${yozora_root}/core/core/YozoraMetal.mm" PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+        target_link_libraries(YozoraCore PUBLIC "-weak_framework Metal" "-weak_framework IOSurface")
+    endif ()
     # glibc 2.43 declares memchr and strchr with _Generic, which -pedantic reports in C99 mode on the host
     set_source_files_properties("${yozora_root}/core/yozora_types.c" "${yozora_root}/core/yozora_navigation.c"
         "${yozora_root}/core/yozora_store.c" "${yozora_root}/core/yozora_address.c" "${yozora_root}/core/yozora_dns.c" "${yozora_root}/core/yozora_accent.c" "${yozora_root}/core/yozora_playlist.c" "${yozora_root}/core/yozora_icons.c" "${yozora_root}/core/yozora_mp4.c" "${yozora_root}/core/yozora_ts.c" "${yozora_root}/core/yozora_hls.c" "${yozora_root}/core/yozora_release.c" "${yozora_root}/core/yozora_log.c" "${yozora_root}/core/yozora_stream_proxy.c" "${yozora_root}/core/yozora_blocklist.c" "${yozora_root}/core/yozora_filter.c" "${yozora_root}/core/yozora_sitegrants.c" "${yozora_root}/core/yozora_budget.c" "${yozora_root}/core/yozora_httpcache.c" "${yozora_root}/core/yozora_keys.c" "${yozora_root}/core/yozora_motion.c" "${yozora_root}/core/yozora_zoom.c" "${yozora_root}/core/yozora_debug.c" "${yozora_root}/core/yozora_translate.c" "${yozora_root}/core/yozora_transfer.c" "${yozora_root}/core/yozora_color.c" "${yozora_root}/core/yozora_render_plan.c" "${yozora_root}/core/yozora_signin.c" "${yozora_root}/core/yozora_icon_environment.c" PROPERTIES COMPILE_OPTIONS "-std=c99;-Wall;-Wextra;-Werror;-pedantic;-Wno-c11-extensions")

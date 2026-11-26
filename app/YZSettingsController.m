@@ -4,6 +4,13 @@
 #import "YZCompat.h"
 #import "YZAccentEditor.h"
 #import "YZTintPicker.h"
+#if defined(__arm64__)
+#import "../core/core/YozoraMetal.h"
+// the row exists where the core can paint tiles on the gpu: arm64 from ios 11
+#define YZMetalRows ([[[UIDevice currentDevice] systemVersion] floatValue] >= 11.0f ? row(YZRowMetal) : nil),
+#else
+#define YZMetalRows
+#endif
 #import "YZBackground.h"
 #import "YZBackgroundPreview.h"
 #import "YZDnsPopup.h"
@@ -62,6 +69,7 @@ typedef enum {
     YZRowUnlockDesigns,
     YZRowJit,
     YZRowJitState,
+    YZRowMetal,
     YZRowUpdate,
     YZRowAbout
 } YZRow;
@@ -1309,8 +1317,8 @@ static NSArray *YZEngineTints(void) {
         [self generalSection:row],
         [NSArray arrayWithObjects:YZT(@"Приватность и безопасность"), row(YZRowBlockTrackers), row(YZRowAdblockRules), row(YZRowSitePermissions), row(YZRowDns), row(YZRowCertificates), row(YZRowBlockThirdPartyCookies),
          row(YZRowSaveHistory), row(YZRowClearHistory), row(YZRowClearSiteData), nil],
-        [NSArray arrayWithObjects:YZT(@"Страницы"), row(YZRowJavascript), row(YZRowEconomy), row(YZRowReduceMotion), row(YZRowHideBars), row(YZRowWebFonts), nil],
-        [NSArray arrayWithObjects:YZT(@"Для разработчиков"), row(YZRowDebug), row(YZRowLogging), row(YZRowLogOpen), row(YZRowZombies), row(YZRowUnlockDesigns), row(YZRowJit), row(YZRowJitState), nil],
+        [NSArray arrayWithObjects:YZT(@"Страницы"), row(YZRowJavascript), row(YZRowEconomy), row(YZRowReduceMotion), row(YZRowWebFonts), nil],
+        [NSArray arrayWithObjects:YZT(@"Для разработчиков"), row(YZRowDebug), row(YZRowLogging), row(YZRowLogOpen), row(YZRowZombies), row(YZRowUnlockDesigns), row(YZRowJit), row(YZRowJitState), YZMetalRows nil],
         [NSArray arrayWithObjects:YZT(@"О программе"), row(YZRowUpdate), row(YZRowAbout), nil],
         nil];
 }
@@ -1562,6 +1570,8 @@ static NSArray *YZEngineTints(void) {
         NSMutableArray *tiers = [NSMutableArray arrayWithObject:@"Baseline"];
         if (info.dfg)
             [tiers addObject:@"DFG"];
+        if (info.ftl)
+            [tiers addObject:@"FTL"];
         if (info.regexp)
             [tiers addObject:@"RegExp"];
         state = [NSString stringWithFormat:YZT(@"Работает: %@"), [tiers componentsJoinedByString:@" · "]];
@@ -1650,6 +1660,7 @@ static NSArray *YZEngineLogos(void) {
     case YZRowUnlockDesigns: return YZT(@"Все оформления");
     case YZRowJit: return @"JIT";
     case YZRowJitState: return YZT(@"Состояние JIT");
+    case YZRowMetal: return @"Metal";
     case YZRowUpdate: return YZT(@"Обновление");
     case YZRowAbout: return YZT(@"Об Yozora");
     // the row of the icon tiles has a title of its own inside its card
@@ -1692,6 +1703,7 @@ static NSArray *YZEngineLogos(void) {
     case YZRowUnlockDesigns: return YZT(@"Оформления, которых нет для этой версии iOS, возможны баги");
     case YZRowJit: return YZT(@"Нужен перезапуск приложения");
     case YZRowJitState: return _jitText ? _jitText : [self jitStateText];
+    case YZRowMetal: return YZT(@"Плитки страниц рисует видеочип, выключите, если они мигают или не обновляются");
     default: return nil;
     }
 }
@@ -1730,6 +1742,7 @@ static NSArray *YZEngineLogos(void) {
     case YZRowLogOpen: return YZIconReceiptLong;
     case YZRowJit: return YZIconBolt;
     case YZRowJitState: return YZIconMemory;
+    case YZRowMetal: return YZIconBolt;
     case YZRowUpdate: return YZIconDownload;
     case YZRowAbout: return YZIconInfo;
     case YZRowAppIcons: return YZIconImage;
@@ -1739,8 +1752,8 @@ static NSArray *YZEngineLogos(void) {
 
 - (BOOL)isSwitch:(YZRow)kind {
     return kind == YZRowBlockTrackers || kind == YZRowBlockThirdPartyCookies || kind == YZRowSaveHistory
-        || kind == YZRowJavascript || kind == YZRowEconomy || kind == YZRowMascotGlow || kind == YZRowReduceMotion || kind == YZRowHideBars || kind == YZRowWebFonts
-        || kind == YZRowDebug || kind == YZRowLogging || kind == YZRowZombies || kind == YZRowUnlockDesigns || kind == YZRowJit;
+        || kind == YZRowJavascript || kind == YZRowEconomy || kind == YZRowMascotGlow || kind == YZRowReduceMotion || kind == YZRowWebFonts
+        || kind == YZRowDebug || kind == YZRowLogging || kind == YZRowZombies || kind == YZRowUnlockDesigns || kind == YZRowJit || kind == YZRowMetal;
 }
 
 - (BOOL)switchValue:(YZRow)kind {
@@ -1759,6 +1772,7 @@ static NSArray *YZEngineLogos(void) {
     case YZRowZombies: return [YZSettings zombies];
     case YZRowUnlockDesigns: return [YZSettings unlockAllDesigns];
     case YZRowJit: return [YZSettings jit];
+    case YZRowMetal: return [YZSettings metal];
     default: return NO;
     }
 }
@@ -1809,6 +1823,12 @@ static NSArray *YZEngineLogos(void) {
     case YZRowJit:
         [YZSettings setJit:on];
         [self refreshAfterSwitch];
+        break;
+    case YZRowMetal:
+        [YZSettings setMetal:on];
+#if defined(__arm64__)
+        yozora_metal_set_allowed(on);
+#endif
         break;
     default: break;
     }

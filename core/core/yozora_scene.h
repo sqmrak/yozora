@@ -34,6 +34,7 @@ typedef struct {
     unsigned width, height;
     float x, y, scale;
     yozora_image *image;
+    void *surface;
 } yozora_scene_tile;
 typedef struct {
     uint64_t id, parent, mask;

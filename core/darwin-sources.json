@@ -210,6 +210,146 @@
       "path": "Source/WTF/wtf/cocoa/NSTypeTraits.h",
       "size": 1242,
       "sha256": "4121670b6a1f13f48ab679aa018ffe382ab7f84bb67fa253b9afba148ad967ab"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlAttachment.mm",
+      "size": 8056,
+      "sha256": "4f6f383867cfefdb67cab27a07475646d5013a0fc31da0c3f92ca1ccb5bb9950"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlBackendSemaphore.mm",
+      "size": 2001,
+      "sha256": "87a9a43090eba2060b55d6ee54a6d48da558e461d79a106364f7ece484efb664"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlBackendSurface.mm",
+      "size": 7699,
+      "sha256": "8ceb362f5bedc8f9a1f2dfbf21bceed5c8077ff01e239c3aadcc6fa58e6bd6f0"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlBuffer.mm",
+      "size": 7111,
+      "sha256": "e6e3822eed896dbe754eafcd50efe7a2428076cfcd73527417b49dfda487425b"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlCaps.mm",
+      "size": 53323,
+      "sha256": "055b3ffd3f77b72a220e68085fca392b898f522b778b7d8d96b58edfedef31b3"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlCommandBuffer.mm",
+      "size": 9931,
+      "sha256": "d40333ef9c36cb05cf14ba0d010f852afc5d78feac91ef2fb095d3b100b07335"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlDepthStencil.mm",
+      "size": 4882,
+      "sha256": "823b341eabcc66241302e62b485d21459cb87a31d26e3ea3f342e78854681610"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlDirectContext.mm",
+      "size": 1583,
+      "sha256": "13ea2ae8f75a590760916129aaa6eca21e10542fef4b110257187406f946f8bc"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlFramebuffer.mm",
+      "size": 1171,
+      "sha256": "ea427ea1180bba96824df90212523691e4c5ef8c7e4c79bda33fcb7b23c65868"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlGpu.mm",
+      "size": 77887,
+      "sha256": "1344431caad29f0b44948fefc99fa04969c3c077bb702fab876e7d08ed4efd47"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlOpsRenderPass.mm",
+      "size": 22983,
+      "sha256": "74824a65d4de4ee2a5ba6cd0129be2402ae2e77a696fff06eb54923e341ec1e2"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlPipelineState.mm",
+      "size": 10447,
+      "sha256": "24ffabc1a1b395b99a98cf10f9a7d3be32a7f1d57f2c46cf5fa00662322709c3"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlPipelineStateBuilder.mm",
+      "size": 35353,
+      "sha256": "51dc6b66ad3158d88bcfddff667158a6ceb9b33330d2c7675358279f3af163a5"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlPipelineStateDataManager.mm",
+      "size": 5996,
+      "sha256": "5d2465c95e0f18b32edacf8aaa882bffaf0737f5cd6b3087a868d8054e215c44"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlRenderTarget.mm",
+      "size": 7619,
+      "sha256": "52e38761504c5055600fd5e7ef03946da55f86f50dde8b45fdf80db13ebb26ae"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlResourceProvider.mm",
+      "size": 10817,
+      "sha256": "0dd6591b1ba7c4c1cb82b800857eecceeafa48121db9e7203497d1e720b21267"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlSampler.mm",
+      "size": 3723,
+      "sha256": "bd2be70fcb8cf9b15753df3968549aad59b15c4ad88271f08fd2bb3392c6e94e"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlSemaphore.mm",
+      "size": 1678,
+      "sha256": "26b4322a8b855901fda8815e93ef7c2eb64caa61b0d5b5c3c975f253e5f697de"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlTexture.mm",
+      "size": 6531,
+      "sha256": "6faf9d1004a3be846a9551c91a60a864bac4f3b4fee90354e390ceee4b7247fa"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlTextureRenderTarget.mm",
+      "size": 8409,
+      "sha256": "9f15e138fece48d69ba78daed12bd0f15c7afb5d3b7be06414e8b6e75767a4dc"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlTrampoline.mm",
+      "size": 681,
+      "sha256": "3671d409c0418c70fe2db433611f98472bfa826bc2836e1511455284a3b76002"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlTypesPriv.mm",
+      "size": 789,
+      "sha256": "527001242344f703cc2742c9c0f1a90c482cbd9792855926b57fff63c7d37fa5"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlUniformHandler.mm",
+      "size": 11089,
+      "sha256": "c99b40b642a74110abdb03d81a231233c8d47950c0fdf2cae7ec37d889d80355"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlUtil.mm",
+      "size": 12816,
+      "sha256": "ae391b696d53a19cd82c236afd891267091accb0021862ce21b1c467512281a2"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/mtl/GrMtlVaryingHandler.mm",
+      "size": 1569,
+      "sha256": "536ab99c96728882a12f8899d50a07fafd880014ce664197142e6da273d06217"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/ganesh/surface/SkSurface_GaneshMtl.mm",
+      "size": 7647,
+      "sha256": "bd4253e69d7218c10003b67cf1fc958d5a4b08079a7467452eda18ed14457e6e"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/mtl/MtlMemoryAllocatorImpl.mm",
+      "size": 1115,
+      "sha256": "9d9575e529af0761c2b97f94bab3a44fc1b72038c37f91d13ab4a89e4e4002ea"
+    },
+    {
+      "path": "Source/ThirdParty/skia/src/gpu/mtl/MtlUtils.mm",
+      "size": 5562,
+      "sha256": "36a690eb667bdc6861a18d1ca297681196db6c7012023232edf416b1b7ecb323"
     }
   ]
 }

@@ -2616,7 +2616,7 @@ run = [["bash", "scripts/build_webcore_ios.sh", "webcore"],
        ["python3", "-B", "scripts/export_link_line.py", "${WEB}/arm64", "build/arm64/link.rsp"]]
 needs = ["core-tools", "core-deps", "text-deps", "web-deps"]
 env = { YOZORA_TC = "${TC}", YOZORA_SDK_V7 = "${SDK_V7}", YOZORA_SDK_V64 = "${SDK_V64}", YOZORA_SLICES = "arm64", YOZORA_BUILD_APP = "0", YOZORA_WEBCORE_IOS_BUILD = "${WEB}" }
-inputs = ["core/**/*.c", "core/**/*.cpp", "core/**/*.h", "core/**/*.hpp", "core/webgl/*.py", "core/*.cmake", "core/patches/*.patch",
+inputs = ["core/core/*.mm", "core/**/*.c", "core/**/*.cpp", "core/**/*.h", "core/**/*.hpp", "core/webgl/*.py", "core/*.cmake", "core/patches/*.patch",
           "core/*.json", "scripts/build_webcore_ios.sh", "scripts/apply_core_patches.py", "scripts/export_link_line.py"]
 outputs = ["build/arm64/link.rsp"]
 keep = true

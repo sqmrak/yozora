@@ -20,6 +20,15 @@ def inspect(otool, path, nm=None):
         opengles = "/System/Library/Frameworks/OpenGLES.framework/OpenGLES"
         if opengles in paths and opengles not in weak:
             raise RuntimeError(f"{arch}: OpenGLES must be linked weakly")
+        # the tiles of arm64 from ios 11 are painted with Metal, linked weakly so ios 7 to 10 start the app, and the armv7 slice has none
+        gpu = {"/System/Library/Frameworks/Metal.framework/Metal", "/System/Library/Frameworks/IOSurface.framework/IOSurface"}
+        if arch == "arm64":
+            strong = {path for path in paths if path in gpu and path not in weak}
+            if strong:
+                raise RuntimeError(f"{arch}: Metal and IOSurface must be linked weakly: {sorted(strong)}")
+            paths = [path for path in paths if path not in gpu]
+        elif gpu & set(paths):
+            raise RuntimeError(f"{arch}: Metal and IOSurface belong to the arm64 slice only")
         paths = [path for path in paths if path != opengles]
         allowed = {"/usr/lib/libSystem.B.dylib", "/usr/lib/libobjc.A.dylib",
                    "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",

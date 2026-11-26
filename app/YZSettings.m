@@ -42,6 +42,7 @@ static NSString *const YZLoggingKey = @"YZLogging";
 static NSString *const YZZombiesKey = @"YZZombies";
 static NSString *const YZUnlockDesignsKey = @"YZUnlockDesigns";
 static NSString *const YZJitKey = @"YZJit";
+static NSString *const YZMetalKey = @"YZMetal";
 // set while a launch with the jit has not reached the browser yet
 static NSString *const YZJitStartingKey = @"YZJitStarting";
 static BOOL YZJitDisabledByFailedStart;
@@ -364,6 +365,8 @@ static void YZClearAccent(BOOL isPrivate) {
 #endif
 }
 + (void)setJit:(BOOL)enabled { [self storeBool:enabled forKey:YZJitKey]; }
++ (BOOL)metal { return [self boolForKey:YZMetalKey defaultValue:YES]; }
++ (void)setMetal:(BOOL)enabled { [self storeBool:enabled forKey:YZMetalKey]; }
 + (BOOL)jitAnswered { return [[NSUserDefaults standardUserDefaults] objectForKey:YZJitKey] != nil; }
 
 // a launch that died while JavaScriptCore started leaves the mark, and the executable mapping is the likely
