@@ -4,6 +4,7 @@
 #import "YZStrings.h"
 #import <AVFoundation/AVFoundation.h>
 #import <objc/message.h>
+#include <dlfcn.h>
 
 // the longest listening, a silence ends it earlier by itself
 static const NSTimeInterval YZVoiceLimit = 20;
@@ -23,6 +24,11 @@ static NSLocale *YZVoiceLocale(void) {
     case YZLanguageJapanese: return [[[NSLocale alloc] initWithLocaleIdentifier:@"ja-JP"] autorelease];
     default: return [[[NSLocale alloc] initWithLocaleIdentifier:@"ru-RU"] autorelease];
     }
+}
+
+// the sdk binds AVAudioSession to AVFAudio, which ios 10 and 13 do not have: a direct reference makes dyld refuse the app at launch
+static AVAudioSession *YZAudioSession(void) {
+    return [NSClassFromString(@"AVAudioSession") sharedInstance];
 }
 
 static id YZSend0(id target, const char *name) {
@@ -89,7 +95,7 @@ static BOOL YZSendBool0(id target, const char *name) {
     _recognizer = nil;
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(stop) object:nil];
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(teardown) object:nil];
-    [[AVAudioSession sharedInstance] setActive:NO error:NULL];
+    [YZAudioSession() setActive:NO error:NULL];
 }
 
 - (void)startWithPartial:(void (^)(NSString *, BOOL))partial failed:(void (^)(NSString *))failed {
@@ -115,7 +121,7 @@ static BOOL YZSendBool0(id target, const char *name) {
                 [self fail:YZT(@"Нет разрешения на распознавание речи: его можно дать в настройках iOS")];
                 return;
             }
-            [AVAudioSession sharedInstance];
+            YZAudioSession();
             [self listen];
         });
     };
@@ -124,8 +130,14 @@ static BOOL YZSendBool0(id target, const char *name) {
 
 - (void)listen {
     NSError *error = nil;
-    AVAudioSession *audio = [AVAudioSession sharedInstance];
-    if (![audio setCategory:AVAudioSessionCategoryRecord error:&error] || ![audio setActive:YES error:&error]) {
+    AVAudioSession *audio = YZAudioSession();
+    NSString *const *record = (NSString *const *)dlsym(RTLD_DEFAULT, "AVAudioSessionCategoryRecord");
+    if (!audio || !record || !*record) {
+        NSLog(@"yozora: voice input: the record audio session is unavailable");
+        [self fail:YZT(@"Не удалось включить микрофон")];
+        return;
+    }
+    if (![audio setCategory:*record error:&error] || ![audio setActive:YES error:&error]) {
         NSLog(@"yozora: voice input: the audio session was refused: %@", error);
         [self fail:YZT(@"Не удалось включить микрофон")];
         return;
