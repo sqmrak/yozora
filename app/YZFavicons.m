@@ -211,10 +211,44 @@ static UIImage *YZScaledIcon(UIImage *image) {
     return lightness > 0.85 ? [UIColor colorWithRed:0.16f green:0.16f blue:0.18f alpha:1] : card;
 }
 
+// popular sites draw their own colored mark from the bundle: the page of Google offers a 16 pixel favicon and a blurred one comes out of it,
+// m.youtube.com and web.telegram.org give small or plain ones. the longest listed domain wins, so mail.google.com is Gmail and not Google
+static UIImage *YZBundledSiteIcon(NSString *host) {
+    static NSDictionary *names;
+    if (!names)
+        names = [[NSDictionary alloc] initWithObjectsAndKeys:
+                 @"google", @"google.com", @"google", @"google.ru", @"gmail", @"mail.google.com", @"gmail", @"gmail.com",
+                 @"duckduckgo", @"duckduckgo.com", @"yandex", @"yandex.ru", @"yandex", @"ya.ru", @"yandex", @"yandex.com",
+                 @"youtube", @"youtube.com", @"youtube", @"youtu.be", @"telegram", @"telegram.org", @"telegram", @"t.me", @"telegram", @"telegram.me",
+                 @"facebook", @"facebook.com", @"facebook", @"fb.com", @"instagram", @"instagram.com",
+                 @"vk", @"vk.com", @"vk", @"vk.ru", @"x", @"x.com", @"x", @"twitter.com", @"wikipedia", @"wikipedia.org",
+                 @"reddit", @"reddit.com", @"github", @"github.com", @"whatsapp", @"whatsapp.com", @"tiktok", @"tiktok.com",
+                 @"twitch", @"twitch.tv", @"discord", @"discord.com", @"discord", @"discord.gg", @"netflix", @"netflix.com",
+                 @"spotify", @"spotify.com", @"pinterest", @"pinterest.com", @"pinterest", @"pinterest.ru", @"linkedin", @"linkedin.com",
+                 @"odnoklassniki", @"ok.ru", @"maildotru", @"mail.ru", @"kinopoisk", @"kinopoisk.ru", @"stackoverflow", @"stackoverflow.com",
+                 @"openai", @"chatgpt.com", @"openai", @"openai.com", @"threads", @"threads.net", @"threads", @"threads.com",
+                 @"tumblr", @"tumblr.com", @"soundcloud", @"soundcloud.com", @"steam", @"steampowered.com", @"steam", @"steamcommunity.com",
+                 @"bluesky", @"bsky.app", @"duolingo", @"duolingo.com", nil];
+    NSString *domain = host;
+    while ([domain length]) {
+        NSString *name = [names objectForKey:domain];
+        if (name)
+            return [YZTheme logoNamed:name];
+        NSRange dot = [domain rangeOfString:@"."];
+        if (dot.location == NSNotFound)
+            break;
+        domain = [domain substringFromIndex:dot.location + 1];
+    }
+    return nil;
+}
+
 + (UIImage *)iconForURL:(NSString *)url {
     NSString *host = [self hostOfURL:url];
     if (!YZSafeHost(host))
         return nil;
+    UIImage *bundled = YZBundledSiteIcon(host);
+    if (bundled)
+        return bundled;
     UIImage *known = [YZFaviconMemory objectForKey:host];
     if (known)
         return known;

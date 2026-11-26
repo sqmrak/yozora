@@ -619,6 +619,122 @@ from = "app/icons/ui/yz-logo-yandex.png"
 to = "yz-logo-yandex.png"
 
 [[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-bluesky.png"
+to = "yz-logo-bluesky.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-discord.png"
+to = "yz-logo-discord.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-duolingo.png"
+to = "yz-logo-duolingo.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-facebook.png"
+to = "yz-logo-facebook.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-github.png"
+to = "yz-logo-github.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-gmail.png"
+to = "yz-logo-gmail.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-instagram.png"
+to = "yz-logo-instagram.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-kinopoisk.png"
+to = "yz-logo-kinopoisk.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-linkedin.png"
+to = "yz-logo-linkedin.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-maildotru.png"
+to = "yz-logo-maildotru.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-netflix.png"
+to = "yz-logo-netflix.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-odnoklassniki.png"
+to = "yz-logo-odnoklassniki.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-openai.png"
+to = "yz-logo-openai.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-pinterest.png"
+to = "yz-logo-pinterest.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-reddit.png"
+to = "yz-logo-reddit.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-soundcloud.png"
+to = "yz-logo-soundcloud.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-spotify.png"
+to = "yz-logo-spotify.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-stackoverflow.png"
+to = "yz-logo-stackoverflow.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-steam.png"
+to = "yz-logo-steam.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-telegram.png"
+to = "yz-logo-telegram.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-threads.png"
+to = "yz-logo-threads.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-tiktok.png"
+to = "yz-logo-tiktok.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-tumblr.png"
+to = "yz-logo-tumblr.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-twitch.png"
+to = "yz-logo-twitch.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-vk.png"
+to = "yz-logo-vk.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-whatsapp.png"
+to = "yz-logo-whatsapp.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-wikipedia.png"
+to = "yz-logo-wikipedia.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-x.png"
+to = "yz-logo-x.png"
+
+[[ipa.ipa-armv7.file]]
+from = "app/icons/ui/yz-logo-youtube.png"
+to = "yz-logo-youtube.png"
+
+[[ipa.ipa-armv7.file]]
 from = "app/icons/ui/yz-memory.png"
 to = "yz-memory.png"
 
@@ -1245,6 +1361,122 @@ from = "app/icons/ui/yz-logo-yandex.png"
 to = "yz-logo-yandex.png"
 
 [[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-bluesky.png"
+to = "yz-logo-bluesky.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-discord.png"
+to = "yz-logo-discord.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-duolingo.png"
+to = "yz-logo-duolingo.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-facebook.png"
+to = "yz-logo-facebook.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-github.png"
+to = "yz-logo-github.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-gmail.png"
+to = "yz-logo-gmail.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-instagram.png"
+to = "yz-logo-instagram.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-kinopoisk.png"
+to = "yz-logo-kinopoisk.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-linkedin.png"
+to = "yz-logo-linkedin.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-maildotru.png"
+to = "yz-logo-maildotru.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-netflix.png"
+to = "yz-logo-netflix.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-odnoklassniki.png"
+to = "yz-logo-odnoklassniki.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-openai.png"
+to = "yz-logo-openai.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-pinterest.png"
+to = "yz-logo-pinterest.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-reddit.png"
+to = "yz-logo-reddit.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-soundcloud.png"
+to = "yz-logo-soundcloud.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-spotify.png"
+to = "yz-logo-spotify.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-stackoverflow.png"
+to = "yz-logo-stackoverflow.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-steam.png"
+to = "yz-logo-steam.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-telegram.png"
+to = "yz-logo-telegram.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-threads.png"
+to = "yz-logo-threads.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-tiktok.png"
+to = "yz-logo-tiktok.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-tumblr.png"
+to = "yz-logo-tumblr.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-twitch.png"
+to = "yz-logo-twitch.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-vk.png"
+to = "yz-logo-vk.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-whatsapp.png"
+to = "yz-logo-whatsapp.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-wikipedia.png"
+to = "yz-logo-wikipedia.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-x.png"
+to = "yz-logo-x.png"
+
+[[ipa.ipa-arm64.file]]
+from = "app/icons/ui/yz-logo-youtube.png"
+to = "yz-logo-youtube.png"
+
+[[ipa.ipa-arm64.file]]
 from = "app/icons/ui/yz-memory.png"
 to = "yz-memory.png"
 
@@ -1869,6 +2101,122 @@ to = "yz-logo-google.png"
 [[ipa.ipa.file]]
 from = "app/icons/ui/yz-logo-yandex.png"
 to = "yz-logo-yandex.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-bluesky.png"
+to = "yz-logo-bluesky.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-discord.png"
+to = "yz-logo-discord.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-duolingo.png"
+to = "yz-logo-duolingo.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-facebook.png"
+to = "yz-logo-facebook.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-github.png"
+to = "yz-logo-github.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-gmail.png"
+to = "yz-logo-gmail.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-instagram.png"
+to = "yz-logo-instagram.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-kinopoisk.png"
+to = "yz-logo-kinopoisk.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-linkedin.png"
+to = "yz-logo-linkedin.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-maildotru.png"
+to = "yz-logo-maildotru.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-netflix.png"
+to = "yz-logo-netflix.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-odnoklassniki.png"
+to = "yz-logo-odnoklassniki.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-openai.png"
+to = "yz-logo-openai.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-pinterest.png"
+to = "yz-logo-pinterest.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-reddit.png"
+to = "yz-logo-reddit.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-soundcloud.png"
+to = "yz-logo-soundcloud.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-spotify.png"
+to = "yz-logo-spotify.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-stackoverflow.png"
+to = "yz-logo-stackoverflow.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-steam.png"
+to = "yz-logo-steam.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-telegram.png"
+to = "yz-logo-telegram.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-threads.png"
+to = "yz-logo-threads.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-tiktok.png"
+to = "yz-logo-tiktok.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-tumblr.png"
+to = "yz-logo-tumblr.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-twitch.png"
+to = "yz-logo-twitch.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-vk.png"
+to = "yz-logo-vk.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-whatsapp.png"
+to = "yz-logo-whatsapp.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-wikipedia.png"
+to = "yz-logo-wikipedia.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-x.png"
+to = "yz-logo-x.png"
+
+[[ipa.ipa.file]]
+from = "app/icons/ui/yz-logo-youtube.png"
+to = "yz-logo-youtube.png"
 
 [[ipa.ipa.file]]
 from = "app/icons/ui/yz-memory.png"
