@@ -292,7 +292,7 @@ static void YZFillRounded(CGContextRef context, CGRect rect, CGFloat radius, CGG
     if (![release.notes length])
         return;
     [self add:[self labelWithText:YZT(@"Что нового") font:[YZTheme boldSystemFontOfSize:16] color:text center:NO lines:1] kind:YZItemLabel gap:_compact ? 18 : 28];
-    [self add:[self labelWithText:release.notes font:[YZTheme systemFontOfSize:14] color:subtle center:NO lines:_compact ? 7 : 0] kind:YZItemLabel gap:6];
+    [self add:[self labelWithText:release.notes font:[YZTheme systemFontOfSize:14] color:subtle center:NO lines:0] kind:YZItemLabel gap:6];
 }
 
 - (void)pressed:(UIButton *)button {
@@ -391,7 +391,8 @@ static YZUpdateCard *YZActiveCard;
     [plate applyTheme];
     _card = plate;
     [self addSubview:_card];
-    _scroll = [[UIScrollView alloc] initWithFrame:CGRectZero];
+    _scroll = [[YZScrollView alloc] initWithFrame:CGRectZero];
+    _scroll.delaysContentTouches = NO;
     _scroll.showsHorizontalScrollIndicator = NO;
     _scroll.alwaysBounceVertical = NO;
     [_card addSubview:_scroll];
