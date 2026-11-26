@@ -68,7 +68,7 @@
     <key>UIPrerenderedIcon</key><true/>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
     <key>CFBundleVersion</key><string>1</string>
-    <key>CFBundleShortVersionString</key><string>2.0.0-stable</string>
+    <key>CFBundleShortVersionString</key><string>2.0.1-stable</string>
     <key>YozoraWebKitVersion</key><string>2.54.3</string>
     <key>MinimumOSVersion</key><string>5.0</string>
     <key>LSRequiresIPhoneOS</key><true/>
