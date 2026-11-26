@@ -1,5 +1,6 @@
 #import "YZCertificates.h"
 #import "YZStreamProxy.h"
+#import "YZStore.h"
 #import "YZStrings.h"
 #import <CommonCrypto/CommonDigest.h>
 #include "yozora_core.h"
@@ -9,8 +10,9 @@ static const NSUInteger YZCertificateMaxSize = 32 * 1024;
 static const NSUInteger YZCertificateMaxCount = 100;
 static const NSUInteger YZCertificateMaxFile = 512 * 1024;
 
+// the folder the profile uses: Library/Yozora refuses writes on some installs (Cocoa error 513) and the profile then moves to Documents/Yozora
 static NSString *YZCertificatesRoot(void) {
-    return [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Yozora"];
+    return [YZStore profileDirectory];
 }
 
 static NSString *YZCertificatesFolder(void) {

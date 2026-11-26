@@ -68,6 +68,32 @@ int main(void)
     CHECK(yozora_transfer_remaining_seconds(0, 86400, 1) == 86400);
     CHECK(yozora_transfer_remaining_seconds(0, 86401, 1) == -1);
 
+    {
+        char field[8];
+        memset(field, 'x', sizeof field);
+        yozora_transfer_copy_text(field, sizeof field, "abc");
+        CHECK(!strcmp(field, "abc"));
+        yozora_transfer_copy_text(field, sizeof field, "1234567");
+        CHECK(!strcmp(field, "1234567"));
+        yozora_transfer_copy_text(field, sizeof field, "12345678");
+        CHECK(!strcmp(field, "1234567"));
+        /* two-byte characters: 3 of them take 6 bytes, the 4th would split at byte 7 */
+        yozora_transfer_copy_text(field, sizeof field, "\xD0\xB0\xD0\xB1\xD0\xB2\xD0\xB3");
+        CHECK(!strcmp(field, "\xD0\xB0\xD0\xB1\xD0\xB2"));
+        /* a three-byte character that starts at byte 6 does not fit and goes whole */
+        yozora_transfer_copy_text(field, sizeof field, "12345\xE3\x81\x82");
+        CHECK(!strcmp(field, "12345"));
+        yozora_transfer_copy_text(field, sizeof field, "");
+        CHECK(field[0] == 0);
+        yozora_transfer_copy_text(field, sizeof field, NULL);
+        CHECK(field[0] == 0);
+        field[0] = 'k';
+        yozora_transfer_copy_text(field, 0, "abc");
+        CHECK(field[0] == 'k');
+        yozora_transfer_copy_text(field, 1, "abc");
+        CHECK(field[0] == 0);
+    }
+
     if (failures)
         return 1;
     puts("test_transfer: ok");

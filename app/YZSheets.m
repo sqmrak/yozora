@@ -724,6 +724,12 @@ typedef enum { YZFileSourcePhotos, YZFileSourceDownloads, YZFileSourceDocuments,
     return files ? YZT(@"Файлы") : @"iCloud Drive";
 }
 
++ (BOOL)hasSourceForAccept:(NSString *)accept {
+    if (YZAcceptsPhotos(accept) && [UIImagePickerController isSourceTypeAvailable:UIImagePickerControllerSourceTypePhotoLibrary])
+        return YES;
+    return YZDownloadsHaveFiles() || YZStorageReadable() || NSClassFromString(@"UIDocumentPickerViewController") != nil;
+}
+
 - (void)present {
     // the picker is its own owner until it has answered
     [self retain];

@@ -1,6 +1,7 @@
 #include "yozora_transfer.h"
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #define TRANSFER_MAX_SECONDS (24 * 60 * 60)
 
@@ -25,6 +26,24 @@ size_t yozora_transfer_size_text(int64_t bytes, char *out, size_t capacity)
         return 0;
     }
     return (size_t)written < capacity ? (size_t)written : capacity - 1;
+}
+
+void yozora_transfer_copy_text(char *out, size_t capacity, const char *text)
+{
+    if (!out || !capacity)
+        return;
+    size_t length = 0;
+    if (text) {
+        while (text[length] && length < capacity - 1)
+            ++length;
+        /* the text goes on past the field: step back over a started character and its continuation bytes */
+        if (text[length]) {
+            while (length > 0 && ((unsigned char)text[length] & 0xC0) == 0x80)
+                --length;
+        }
+        memcpy(out, text, length);
+    }
+    out[length] = 0;
 }
 
 double yozora_transfer_fraction(int64_t received, int64_t total)

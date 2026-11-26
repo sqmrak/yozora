@@ -3,6 +3,7 @@
 #import "YZClassic.h"
 #import "YZCompat.h"
 #import "YZCrash.h"
+#import "YZSheets.h"
 #import "YZStrings.h"
 #import "YZTheme.h"
 #import <objc/message.h>
@@ -32,8 +33,6 @@ static NSString *const YZCertificatesRowIdentifier = @"yozora.certificates.row";
     [_fill release];
     [super dealloc];
 }
-
-- (BOOL)hasDocumentPicker { return NSClassFromString(@"UIDocumentPickerViewController") != nil; }
 
 - (void)loadView {
     UIView *root = [[UIView alloc] initWithFrame:[[UIScreen mainScreen] applicationFrame]];
@@ -105,7 +104,6 @@ static NSString *const YZCertificatesRowIdentifier = @"yozora.certificates.row";
     [_entries release];
     _entries = [[YZCertificates entries] retain];
     [_table reloadData];
-    _add.hidden = ![self hasDocumentPicker];
     _subtitleLabel.text = [_entries count] ? [NSString stringWithFormat:@"%lu", (unsigned long)[_entries count]] : YZT(@"Своих сертификатов нет");
     [self.view setNeedsLayout];
 }
@@ -208,6 +206,38 @@ static NSString *const YZCertificatesRowIdentifier = @"yozora.certificates.row";
     [self takeData:[text dataUsingEncoding:NSASCIIStringEncoding allowLossyConversion:YES]];
 }
 
+// a certificate is a few kilobytes, a bigger file is not one and is not read into the memory of an old phone
+static const unsigned long long YZCertificateFileLimit = 1024 * 1024;
+
+// ios before 8 has no system picker: the sheet of the app lists the downloads folder (a certificate fetched by a page lands there), the storage of
+// the device where the process may read it, and the system picker where there is one
+- (void)pickFromSheet {
+    NSString *accept = @".crt,.cer,.pem,.der,.p7b";
+    if (![YZFilePicker hasSourceForAccept:accept]) {
+        [self say:YZT(@"Выбирать нечего: скачайте файл сертификата в Yozora, он появится в «Загрузках», или вставьте текст из буфера обмена")];
+        return;
+    }
+    _picking = YES;
+    __block YZCertificatesController *me = self;
+    YZFilePicker *picker = [[[YZFilePicker alloc] initWithHost:self accept:accept multiple:NO bottomInset:0 completion:^(NSArray *paths) {
+        me->_picking = NO;
+        if (![paths count])
+            return;
+        NSString *path = [paths objectAtIndex:0];
+        NSDictionary *attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:NULL];
+        if ([[attributes objectForKey:NSFileSize] unsignedLongLongValue] > YZCertificateFileLimit) {
+            [me say:YZT(@"Файл слишком большой для сертификата")];
+            return;
+        }
+        NSData *data = [NSData dataWithContentsOfFile:path];
+        if (data)
+            [me takeData:data];
+        else
+            [me say:YZT(@"Файл не удалось прочитать")];
+    }] autorelease];
+    [picker present];
+}
+
 // UIDocumentPickerViewController came with ios 8, looked up at run time, the armv7 sdk has none
 - (void)addPressed {
     if (_picking)
@@ -217,7 +247,7 @@ static NSString *const YZCertificatesRowIdentifier = @"yozora.certificates.row";
     id picker = [pickerClass alloc];
     if (!pickerClass || ![picker respondsToSelector:initializer]) {
         [picker release];
-        [self say:YZT(@"На этой версии iOS файлы выбрать нельзя, вставьте сертификат из буфера обмена")];
+        [self pickFromSheet];
         return;
     }
     // the import mode copies the file into the app, so it can be read after the picker is gone
@@ -231,7 +261,8 @@ static NSString *const YZCertificatesRowIdentifier = @"yozora.certificates.row";
     (void)picker;
     _picking = NO;
     NSURL *url = [urls count] ? [urls objectAtIndex:0] : nil;
-    NSData *data = [url isFileURL] ? [NSData dataWithContentsOfFile:[url path]] : nil;
+    NSDictionary *attributes = [url isFileURL] ? [[NSFileManager defaultManager] attributesOfItemAtPath:[url path] error:NULL] : nil;
+    NSData *data = [url isFileURL] && [[attributes objectForKey:NSFileSize] unsignedLongLongValue] <= YZCertificateFileLimit ? [NSData dataWithContentsOfFile:[url path]] : nil;
     // the picker closes itself, the answer waits for it
     [self performSelector:@selector(takeFileData:) withObject:data ? data : (id)[NSNull null] afterDelay:0.4];
 }

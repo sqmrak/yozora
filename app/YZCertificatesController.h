@@ -3,7 +3,7 @@
 #import "YZControls.h"
 #import "YZDialog.h"
 
-/* the root certificates the person added (YZCertificates): a file from the files app (ios 8 and newer), or the
+/* the root certificates the person added (YZCertificates): a file (the files app on ios 8 and newer, the downloads folder and the storage of the device through the sheet of the app on every system), or the
    text of a certificate from the clipboard. every certificate is asked about before it is trusted, since it is
    trusted for every site. a swipe takes one back */
 @interface YZCertificatesController : UIViewController <UITableViewDataSource, UITableViewDelegate> {

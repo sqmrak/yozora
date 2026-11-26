@@ -14,6 +14,11 @@ extern "C" {
    zero. writes at most capacity bytes with the terminator and returns the length, 0 when capacity is 0 */
 size_t yozora_transfer_size_text(int64_t bytes, char *out, size_t capacity);
 
+/* copies text into a fixed field and ends it with a terminator. a text that does not fit is cut before the
+   character it would split, so the field is always valid utf-8 (a cut character makes NSString return nil).
+   a null text gives an empty string, a capacity of 0 writes nothing */
+void yozora_transfer_copy_text(char *out, size_t capacity, const char *text);
+
 /* received over total held to 0..1, or -1 when the total is not known (zero or less). a received count past the total gives 1 */
 double yozora_transfer_fraction(int64_t received, int64_t total);
 

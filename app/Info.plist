@@ -72,6 +72,9 @@
     <key>YozoraWebKitVersion</key><string>2.54.3</string>
     <key>MinimumOSVersion</key><string>5.0</string>
     <key>LSRequiresIPhoneOS</key><true/>
+    <!-- the Documents folder, where the downloads are, shows in the Files app under On My iPhone and in file sharing of a computer -->
+    <key>UIFileSharingEnabled</key><true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key><true/>
     <!-- the log screen only: pages never see this font, the core catalog reads app/fonts -->
     <key>UIAppFonts</key><array><string>JetBrainsMono-Regular.ttf</string></array>
     <key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>

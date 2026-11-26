@@ -75,6 +75,9 @@
 }
 - (id)initWithHost:(UIViewController *)host accept:(NSString *)accept multiple:(BOOL)multiple bottomInset:(CGFloat)bottomInset completion:(void (^)(NSArray *paths))completion;
 - (void)present;
+/* whether any place has something to offer for this accept list: photos, a downloads folder with a file in it, the device storage where the process may
+   read it, the system picker. a caller that is not a page tells the person what to do instead of opening an empty sheet */
++ (BOOL)hasSourceForAccept:(NSString *)accept;
 /* the page is gone: everything shown is closed and the answer is an empty list */
 - (void)cancel;
 @end

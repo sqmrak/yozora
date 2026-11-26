@@ -120,7 +120,6 @@ static NSDictionary *YZEnglish(void) {
         @"The browser will trust sites that use this certificate. Add it only if you know where it came from.", @"Браузер будет доверять сайтам с этим сертификатом. Добавляйте его, только если знаете, откуда он.",
         @"The certificate was not added", @"Сертификат не добавлен",
         @"The clipboard has no certificate text", @"В буфере обмена нет текста сертификата",
-        @"Files cannot be chosen on this version of iOS, paste the certificate from the clipboard", @"На этой версии iOS файлы выбрать нельзя, вставьте сертификат из буфера обмена",
         @"The file could not be read", @"Файл не удалось прочитать",
         @"The file is empty or too large for a certificate", @"Файл пустой или слишком большой для сертификата",
         @"The file holds no certificate. A .crt, .cer or .pem file is needed", @"В файле нет сертификата. Нужен .crt, .cer или .pem",
@@ -393,6 +392,12 @@ static NSDictionary *YZEnglish(void) {
         @"Too many open windows", @"Слишком много открытых окон",
         @"This file could not be downloaded", @"Этот файл не удалось загрузить",
         @"Mascot glow", @"Свечение маскота",
+        @"Nothing to choose from: download the certificate file in Yozora, it will appear in Downloads, or paste its text from the clipboard", @"Выбирать нечего: скачайте файл сертификата в Yozora, он появится в «Загрузках», или вставьте текст из буфера обмена",
+        @"The file is too large for a certificate", @"Файл слишком большой для сертификата",
+        @"Folder with the files: Yozora › Downloads", @"Папка с файлами: Yozora › Downloads",
+        @"Open the folder with the files", @"Открыть папку с файлами",
+        @"Folder with the files", @"Папка с файлами",
+        @"The files are in the Downloads folder inside Yozora: the Files app, On My iPhone, Yozora, Downloads. The full path:", @"Файлы лежат в папке Downloads внутри Yozora: приложение «Файлы», На iPhone, Yozora, Downloads. Полный путь:",
         nil];
     return table;
 }
@@ -474,7 +479,6 @@ static NSDictionary *YZJapanese(void) {
         @"ブラウザはこの証明書を使うサイトを信頼します。入手元がわかる場合のみ追加してください。", @"Браузер будет доверять сайтам с этим сертификатом. Добавляйте его, только если знаете, откуда он.",
         @"証明書は追加されませんでした", @"Сертификат не добавлен",
         @"クリップボードに証明書のテキストがありません", @"В буфере обмена нет текста сертификата",
-        @"このバージョンの iOS ではファイルを選べません。クリップボードから貼り付けてください", @"На этой версии iOS файлы выбрать нельзя, вставьте сертификат из буфера обмена",
         @"ファイルを読み込めませんでした", @"Файл не удалось прочитать",
         @"ファイルが空か、証明書としては大きすぎます", @"Файл пустой или слишком большой для сертификата",
         @"ファイルに証明書がありません。.crt、.cer、.pem が必要です", @"В файле нет сертификата. Нужен .crt, .cer или .pem",
@@ -788,6 +792,12 @@ static NSDictionary *YZJapanese(void) {
         @"アップデートファイルが大きすぎます", @"Файл обновления слишком большой",
         @"ファイルのダウンロードが完了していません", @"Файл скачался не полностью",
         @"新機能", @"Что нового",
+        @"選べるファイルがありません。Yozora で証明書ファイルをダウンロードすると「ダウンロード」に表示されます。またはクリップボードのテキストを貼り付けてください", @"Выбирать нечего: скачайте файл сертификата в Yozora, он появится в «Загрузках», или вставьте текст из буфера обмена",
+        @"証明書にしてはファイルが大きすぎます", @"Файл слишком большой для сертификата",
+        @"ファイルのフォルダ: Yozora › Downloads", @"Папка с файлами: Yozora › Downloads",
+        @"ファイルのフォルダを開く", @"Открыть папку с файлами",
+        @"ファイルのフォルダ", @"Папка с файлами",
+        @"ファイルは Yozora 内の Downloads フォルダにあります。「ファイル」アプリの「このiPhone内」、Yozora、Downloads。フルパス:", @"Файлы лежат в папке Downloads внутри Yozora: приложение «Файлы», На iPhone, Yozora, Downloads. Полный путь:",
         nil];
     return table;
 }

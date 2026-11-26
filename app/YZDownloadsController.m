@@ -1,11 +1,14 @@
 #import "YZDownloadsController.h"
 #import "YZCrash.h"
 #import "YZCompat.h"
+#import "YZClassic.h"
 #import "YZControls.h"
+#import "YZDialog.h"
 #import "YZStrings.h"
 #import "YZTheme.h"
 #import "YZWaveSeekBar.h"
 #import <QuartzCore/QuartzCore.h>
+#import <objc/message.h>
 #include "yozora_core.h"
 #include "yozora_transfer.h"
 
@@ -211,12 +214,66 @@ static const CGFloat YZDownloadEmptyHeight = 220;
     [YZCrash note:[NSString stringWithFormat:@"screen %@", NSStringFromClass([self class])]];
     self.tableView.backgroundColor = [YZTheme screenColor];
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
-    self.tableView.tableHeaderView = [YZTheme isClassic] ? nil : [YZTheme titleHeaderWithText:self.title width:self.tableView.bounds.size.width];
+    self.tableView.tableHeaderView = [self headerForWidth:self.tableView.bounds.size.width];
     [YZTheme styleNavigationBar:self.navigationController.navigationBar];
     [self reload];
     // the numbers of a running download change under the list
     [_timer invalidate];
     _timer = [NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(reload) userInfo:nil repeats:YES];
+}
+
+// the title of the screen (not in the classic design, which has the bar for it) and under it the address of the folder the files are in, a
+// link that opens it
+- (UIView *)headerForWidth:(CGFloat)width {
+    UIView *title = [YZTheme isClassic] ? nil : [YZTheme titleHeaderWithText:self.title width:width];
+    CGFloat top = title ? title.frame.size.height - 14 : 10;
+    UIView *header = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, width, top + 44)] autorelease];
+    header.backgroundColor = title ? [YZTheme surfaceColor] : [UIColor clearColor];
+    if (title)
+        [header addSubview:title];
+    UIButton *link = [UIButton buttonWithType:UIButtonTypeCustom];
+    link.frame = CGRectMake(28, top, MAX((CGFloat)0, width - 56), 34);
+    link.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    link.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+    link.titleLabel.font = [YZTheme systemFontOfSize:15];
+    link.titleLabel.lineBreakMode = YZLineBreakTailTruncation;
+    [link setTitle:YZT(@"Папка с файлами: Yozora › Downloads") forState:UIControlStateNormal];
+    [link setTitleColor:[YZTheme isClassic] ? [YZClassic inkColor] : [YZTheme accentColor] forState:UIControlStateNormal];
+    [link setTitleColor:[YZTheme subtleTextColor] forState:UIControlStateHighlighted];
+    link.accessibilityLabel = YZT(@"Открыть папку с файлами");
+    [link addTarget:self action:@selector(openFolderPressed) forControlEvents:UIControlEventTouchUpInside];
+    [header addSubview:link];
+    return header;
+}
+
+// the Files app opens a folder of this app by its path (ios 13 and later, and only because Info.plist shares Documents). a system without the
+// scheme, or one that refuses, is told where the files are in words, so nobody has to look for them
+- (void)openFolderPressed {
+    NSString *directory = [YZDownloadsController directory];
+    [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:NULL];
+    NSString *escaped = [directory stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+    NSURL *url = escaped ? [NSURL URLWithString:[@"shareddocuments://" stringByAppendingString:escaped]] : nil;
+    UIApplication *application = [UIApplication sharedApplication];
+    SEL modern = NSSelectorFromString(@"openURL:options:completionHandler:");
+    if (!url || ![application respondsToSelector:modern]) {
+        [self showFolderLocation:directory];
+        return;
+    }
+    void (^done)(BOOL) = ^(BOOL opened) {
+        if (!opened)
+            [self showFolderLocation:directory];
+    };
+    void (*open)(id, SEL, NSURL *, NSDictionary *, void (^)(BOOL)) = (void (*)(id, SEL, NSURL *, NSDictionary *, void (^)(BOOL)))(void *)objc_msgSend;
+    open(application, modern, url, [NSDictionary dictionary], [[done copy] autorelease]);
+}
+
+- (void)showFolderLocation:(NSString *)directory {
+    YZDialog *dialog = [YZDialog dialogWithTitle:YZT(@"Папка с файлами") message:[NSString stringWithFormat:@"%@\n\n%@", YZT(@"Файлы лежат в папке Downloads внутри Yozora: приложение «Файлы», На iPhone, Yozora, Downloads. Полный путь:"), directory]
+                                     cancelTitle:nil confirmTitle:YZT(@"Закрыть") destructive:NO handler:^(NSInteger index, NSArray *texts) {
+        (void)index;
+        (void)texts;
+    }];
+    [dialog showInView:self.navigationController ? self.navigationController.view : self.view];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {

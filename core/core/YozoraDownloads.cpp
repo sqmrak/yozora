@@ -5,6 +5,7 @@
 #include "YozoraCoreThread.h"
 #include "CurlRequest.h"
 #include "yozora_debug.h"
+#include "yozora_transfer.h"
 #include "CurlRequestClient.h"
 #include "CurlResponse.h"
 #include "HTTPHeaderNames.h"
@@ -257,7 +258,7 @@ private:
         update([&](yozora_download& item) {
             item.state = state;
             if (error)
-                std::snprintf(item.error, sizeof(item.error), "%s", error);
+                yozora_transfer_copy_text(item.error, sizeof(item.error), error);
         });
         auto& list = jobs();
         list.erase(std::remove_if(list.begin(), list.end(), [&](Ref<Job>& job) { return job.ptr() == this; }), list.end());
@@ -357,20 +358,26 @@ private:
             pthread_mutex_unlock(&items_lock);
             if (dir.empty())
                 return fail("No folder for downloads");
-            mkdir(dir.c_str(), 0755);
+            // a folder that exists already is the normal case, any other refusal is the reason shown for the file
+            if (mkdir(dir.c_str(), 0755) && errno != EEXIST) {
+                std::string reason = std::string("The downloads folder is not available: ") + std::strerror(errno);
+                return fail(reason.c_str());
+            }
             name = unique_name(dir, name);
             m_path = dir + "/" + name;
             m_part = m_path + ".part";
         }
         m_file = std::fopen(m_part.c_str(), partial ? "ab" : "wb");
-        if (!m_file)
-            return fail("The file could not be created");
+        if (!m_file) {
+            std::string reason = std::string("The file could not be created: ") + std::strerror(errno);
+            return fail(reason.c_str());
+        }
         m_partExists = true;
         m_partIntact = true;
         auto name = m_path.substr(m_path.rfind('/') + 1);
         update([&](yozora_download& item) {
-            std::snprintf(item.name, sizeof(item.name), "%s", name.c_str());
-            std::snprintf(item.path, sizeof(item.path), "%s", m_path.c_str());
+            yozora_transfer_copy_text(item.name, sizeof(item.name), name.c_str());
+            yozora_transfer_copy_text(item.path, sizeof(item.path), m_path.c_str());
             item.total = total;
             item.received = static_cast<long long>(m_received);
         });
@@ -404,9 +411,7 @@ private:
         if (m_curl.get() != &request)
             return;
         auto text = error.localizedDescription().utf8();
-        char message[160];
-        std::snprintf(message, sizeof(message), "%s", text.length() ? text.data() : "The connection failed");
-        fail(message);
+        fail(text.length() ? text.data() : "The connection failed");
     }
 
     unsigned m_id;
@@ -480,7 +485,7 @@ bool start(const ResourceRequest& original, const String& suggestedName)
     item.id = id;
     item.state = YOZORA_DOWNLOAD_QUEUED;
     auto text = request.url().string().utf8();
-    std::snprintf(item.name, sizeof(item.name), "%s", text.data());
+    yozora_transfer_copy_text(item.name, sizeof(item.name), text.data());
     list.push_back(item);
     pthread_mutex_unlock(&items_lock);
     jobs().push_back(Job::create(id, request, suggestedName));
