@@ -71,3 +71,4 @@
 @property(nonatomic, copy) void (^refill)(YZChoiceController *screen);
 - (id)initWithTitle:(NSString *)title options:(NSArray *)titles selected:(NSInteger)selected choose:(void (^)(NSInteger index))choose;
 @end
+

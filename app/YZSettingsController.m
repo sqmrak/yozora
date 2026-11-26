@@ -12,7 +12,6 @@
 #define YZMetalRows
 #endif
 #import "YZBackground.h"
-#import "YZBackgroundPreview.h"
 #import "YZDnsPopup.h"
 #import "YZMascotPreview.h"
 #import "YZAppIcon.h"
@@ -46,7 +45,6 @@ typedef enum {
     YZRowAccent,
     YZRowPrivateAccent,
     YZRowMascot,
-    YZRowBackground,
     YZRowSearchEngine,
     YZRowTextSize,
     YZRowAppIcons,
@@ -1082,24 +1080,6 @@ static UIColor *YZMixColors(UIColor *first, UIColor *second, CGFloat t) {
 - (id)initWithChanged:(void (^)(void))changed;
 @end
 
-@interface YZBackgroundController : UIViewController <UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIPopoverControllerDelegate> {
-    YZBackgroundPreview *_preview;
-    YZStore *_store;
-    UIView *_card;
-    UIButton *_backKey;
-    UILabel *_value;
-    YZAccentTrack *_track;
-    UIButton *_choose;
-    UIButton *_remove;
-    UIPopoverController *_popover;
-    NSInteger _percent;
-    NSInteger _shownStamp;
-    BOOL _storing;
-    void (^_changed)(void);
-}
-- (id)initWithStore:(YZStore *)store changed:(void (^)(void))changed;
-@end
-
 @interface YZAboutController : UITableViewController {
     YZBarFill *_barFill;
     UIImageView *_hero;
@@ -1640,7 +1620,6 @@ static NSArray *YZEngineLogos(void) {
     case YZRowAccent: return YZT(@"Цвет акцента");
     case YZRowPrivateAccent: return YZT(@"Акцент приватной вкладки");
     case YZRowMascot: return YZT(@"Маскот");
-    case YZRowBackground: return YZT(@"Фон");
     case YZRowSearchEngine: return YZT(@"Поисковая система");
     case YZRowTextSize: return YZT(@"Размер текста");
     case YZRowBlockTrackers: return YZT(@"Блокировать рекламу и трекеры");
@@ -1683,7 +1662,6 @@ static NSArray *YZEngineLogos(void) {
     case YZRowAccent: return [self accentName];
     case YZRowPrivateAccent: return [self privateAccentName];
     case YZRowMascot: return [self mascotName];
-    case YZRowBackground: return [YZBackground image] ? [NSString stringWithFormat:@"%d%%", (int)[YZSettings homeBackgroundBlur]] : YZT(@"Нет");
     case YZRowSearchEngine: return [self coreName];
     case YZRowTextSize: return [NSString stringWithFormat:@"%d%%", (int)[YZSettings textZoom]];
     case YZRowUpdate: {
@@ -1723,7 +1701,6 @@ static NSArray *YZEngineLogos(void) {
     case YZRowAccent: return YZIconPalette;
     case YZRowPrivateAccent: return YZIconBrush;
     case YZRowMascot: return YZIconImage;
-    case YZRowBackground: return YZIconImage;
     case YZRowSearchEngine: return YZIconSearch;
     case YZRowTextSize: return YZIconTextSize;
     case YZRowBlockTrackers: return YZIconShield;
@@ -2229,12 +2206,6 @@ static NSArray *YZEngineLogos(void) {
         [YZCrash note:@"logs: pushed"];
         break;
     }
-    case YZRowBackground: {
-        YZBackgroundController *background = [[YZBackgroundController alloc] initWithStore:_store changed:^{ [me changed]; }];
-        [self.navigationController pushViewController:background animated:YES];
-        [background release];
-        break;
-    }
     case YZRowTextSize: {
         YZTextSizeController *size = [[YZTextSizeController alloc] initWithChanged:^{ [me changed]; }];
         [self.navigationController pushViewController:size animated:YES];
@@ -2614,280 +2585,8 @@ static NSArray *YZEngineLogos(void) {
 
 @end
 
-@implementation YZBackgroundController
-
-- (id)initWithStore:(YZStore *)store changed:(void (^)(void))changed {
-    self = [super initWithNibName:nil bundle:nil];
-    if (!self)
-        return nil;
-    _store = [store retain];
-    _changed = [changed copy];
-    _percent = [YZSettings homeBackgroundBlur];
-    _shownStamp = -1;
-    return self;
-}
-
-- (void)dealloc {
-    [YZCrash noteLifecycle:@"dealloc" object:self];
-    _popover.delegate = nil;
-    [_popover release];
-    _preview.tapped = nil;
-    [_preview release];
-    [_card release];
-    [_backKey release];
-    [_store release];
-    [_value release];
-    [_track release];
-    [_choose release];
-    [_remove release];
-    [_changed release];
-    [super dealloc];
-}
-
-// the screen is the start page at its real size with the controls on a card over its foot, the bar of the navigation stack is not used
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    if ([self respondsToSelector:NSSelectorFromString(@"setWantsFullScreenLayout:")])
-        [self setValue:[NSNumber numberWithBool:YES] forKey:@"wantsFullScreenLayout"];
-    _preview = [[YZBackgroundPreview alloc] initWithFrame:self.view.bounds];
-    _preview.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    // a touch on the page while it has no photo opens the library, as the button does
-    _preview.tapped = ^{ [self choosePicture]; };
-    [self.view addSubview:_preview];
-    _backKey = [[YZStateButton buttonWithType:UIButtonTypeCustom] retain];
-    [_backKey addTarget:self action:@selector(back) forControlEvents:UIControlEventTouchUpInside];
-    _backKey.accessibilityLabel = YZT(@"Назад");
-    [self.view addSubview:_backKey];
-    _card = [[UIView alloc] initWithFrame:CGRectZero];
-    _card.layer.shadowColor = [[UIColor blackColor] CGColor];
-    _card.layer.shadowOpacity = 0.18f;
-    _card.layer.shadowRadius = 10;
-    _card.layer.shadowOffset = CGSizeMake(0, 3);
-    [self.view addSubview:_card];
-    _value = [[UILabel alloc] initWithFrame:CGRectZero];
-    _value.backgroundColor = [UIColor clearColor];
-    _value.textAlignment = YZTextAlignmentCenter;
-    [_card addSubview:_value];
-    _track = [[YZAccentTrack alloc] initWithFrame:CGRectZero];
-    _track.spokenName = YZT(@"Размытие фона");
-    [_track addTarget:self action:@selector(moved) forControlEvents:UIControlEventValueChanged];
-    [_track addTarget:self action:@selector(commit) forControlEvents:UIControlEventTouchUpInside];
-    [_card addSubview:_track];
-    _choose = [[UIButton buttonWithType:UIButtonTypeCustom] retain];
-    _choose.layer.cornerRadius = 18;
-    [_choose addTarget:self action:@selector(choosePicture) forControlEvents:UIControlEventTouchUpInside];
-    [_card addSubview:_choose];
-    _remove = [[UIButton buttonWithType:UIButtonTypeCustom] retain];
-    _remove.layer.cornerRadius = 18;
-    [_remove addTarget:self action:@selector(removePicture) forControlEvents:UIControlEventTouchUpInside];
-    [_card addSubview:_remove];
-    [self restyle];
-}
-
-- (NSString *)valueText {
-    return [NSString stringWithFormat:@"%@ %d%%", YZT(@"Размытие"), (int)_percent];
-}
-
-- (void)showState {
-    NSInteger stamp = [YZSettings homeBackgroundStamp];
-    UIImage *picture = [YZBackground image];
-    _value.text = [self valueText];
-    _track.fraction = (float)_percent / 100.0f;
-    // a new photo dissolves into the old one, a new blur follows the finger without it
-    [_preview showPicture:[YZBackground imageBlurredBy:_percent] dissolve:stamp != _shownStamp && _shownStamp >= 0];
-    _shownStamp = stamp;
-    _track.enabled = picture != nil;
-    _track.alpha = picture ? 1 : 0.4f;
-    _remove.hidden = picture == nil;
-    [_choose setTitle:picture ? YZT(@"Другое фото") : YZT(@"Выбрать фото") forState:UIControlStateNormal];
-    _choose.enabled = !_storing;
-    [self.view setNeedsLayout];
-}
-
-- (void)restyle {
-    self.view.backgroundColor = [YZTheme screenColor];
-    YZPaintBehindScreens(self.navigationController);
-    [_preview restyle];
-    // the tiles of the page are the person's own sites and bookmarks, ordered as the start page orders them
-    NSMutableArray *sites = [NSMutableArray arrayWithArray:[_store recentHistory]];
-    [sites sortUsingComparator:^NSComparisonResult(YZRecord *a, YZRecord *b) {
-        if (a.visits == b.visits)
-            return NSOrderedSame;
-        return a.visits > b.visits ? NSOrderedAscending : NSOrderedDescending;
-    }];
-    [_preview showSites:sites bookmarks:[_store bookmarks]];
-    [_backKey setImage:[YZTheme barIcon:YZIconBack size:24 disabled:NO] forState:UIControlStateNormal];
-    // a little see-through, the page and the photo show faintly behind it
-    _card.backgroundColor = [[YZTheme cardColor] colorWithAlphaComponent:0.9f];
-    _card.layer.cornerRadius = MIN([YZTheme sheetRadius], (CGFloat)18);
-    _value.font = [YZTheme boldSystemFontOfSize:15];
-    _value.textColor = [YZTheme accentColor];
-    [_track setColors:[NSArray arrayWithObjects:YZMixColors([YZTheme surfaceColor], [YZTheme accentColor], 0.3f), [YZTheme accentColor], nil]];
-    [_track setHandleColor:[YZTheme accentColor]];
-    for (UIButton *button in [NSArray arrayWithObjects:_choose, _remove, nil]) {
-        button.backgroundColor = [YZTheme surfaceColor];
-        button.titleLabel.font = [YZTheme boldSystemFontOfSize:14];
-    }
-    [_choose setTitleColor:[YZTheme accentColor] forState:UIControlStateNormal];
-    [_remove setTitle:YZT(@"Убрать фон") forState:UIControlStateNormal];
-    [_remove setTitleColor:[UIColor colorWithRed:0.86f green:0.22f blue:0.22f alpha:1] forState:UIControlStateNormal];
-    [self showState];
-}
-
-- (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
-    [YZCrash note:[NSString stringWithFormat:@"screen %@", NSStringFromClass([self class])]];
-    [self.navigationController setNavigationBarHidden:YES animated:animated];
-    [self restyle];
-}
-
-- (void)viewWillDisappear:(BOOL)animated {
-    [super viewWillDisappear:animated];
-    // the screens of the stack show their own bar
-    if (self.navigationController.topViewController != self)
-        [self.navigationController setNavigationBarHidden:NO animated:animated];
-}
-
-// the status line, the notch and the home indicator, as the browser reads them
-- (UIEdgeInsets)screenInsets {
-    UIEdgeInsets insets = UIEdgeInsetsZero;
-    if ([self.view respondsToSelector:NSSelectorFromString(@"safeAreaInsets")])
-        insets = [[self.view valueForKey:@"safeAreaInsets"] UIEdgeInsetsValue];
-    CGFloat status = [[UIApplication sharedApplication] statusBarFrame].size.height;
-    insets.top = MAX(insets.top, MIN(status, (CGFloat)44));
-    return insets;
-}
-
-- (void)viewDidLayoutSubviews {
-    [super viewDidLayoutSubviews];
-    UIEdgeInsets insets = [self screenInsets];
-    _preview.insets = insets;
-    [_preview layoutIfNeeded];
-    _backKey.frame = [_preview backKeyFrame];
-    CGFloat viewWidth = self.view.bounds.size.width;
-    CGFloat width = MIN((CGFloat)340, viewWidth - 32), pad = 10;
-    BOOL removable = !_remove.hidden;
-    CGFloat height = pad + 20 + 30 + 6 + 36 + pad;
-    CGFloat bottom = [_preview pageBottom] - 10;
-    // a card that would cover more than the room between the bars keeps to it, the page above stays visible
-    CGFloat top = MAX([_preview pageTop] + 8, bottom - height);
-    _card.frame = CGRectMake(floor((viewWidth - width) / 2), top, width, bottom - top);
-    _card.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:_card.bounds cornerRadius:_card.layer.cornerRadius].CGPath;
-    _value.frame = CGRectMake(pad, pad, width - 2 * pad, 20);
-    _track.frame = CGRectMake(pad, pad + 20, width - 2 * pad, 30);
-    CGFloat buttonsTop = pad + 20 + 30 + 6;
-    CGFloat buttonWidth = removable ? floor((width - 3 * pad) / 2) : width - 2 * pad;
-    _choose.frame = CGRectMake(pad, buttonsTop, buttonWidth, 36);
-    _remove.frame = CGRectMake(pad * 2 + buttonWidth, buttonsTop, buttonWidth, 36);
-}
-
-- (void)back { [self.navigationController popViewControllerAnimated:YES]; }
-
-// steps of 5 percent, the preview follows the finger and the setting is taken when the finger is lifted
-- (NSInteger)percentForFraction:(float)fraction {
-    NSInteger raw = (NSInteger)lroundf(fraction * 100);
-    return MIN((NSInteger)100, MAX((NSInteger)0, ((raw + 2) / 5) * 5));
-}
-
-- (void)moved {
-    NSInteger percent = [self percentForFraction:_track.fraction];
-    if (percent == _percent)
-        return;
-    _percent = percent;
-    _value.text = [self valueText];
-    [_preview showPicture:[YZBackground imageBlurredBy:_percent] dissolve:NO];
-}
-
-- (void)commit {
-    _percent = [self percentForFraction:_track.fraction];
-    [YZSettings setHomeBackgroundBlur:_percent];
-    if (_changed)
-        _changed();
-    [self showState];
-}
-
-- (void)choosePicture {
-    if (_storing || ![UIImagePickerController isSourceTypeAvailable:UIImagePickerControllerSourceTypePhotoLibrary])
-        return;
-    UIImagePickerController *picker = [[[UIImagePickerController alloc] init] autorelease];
-    picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
-    picker.delegate = self;
-    // the photo library of an ipad is shown in a popover, a full screen one is refused by the system before ios 13
-    if ([YZTheme isPad] && NSClassFromString(@"UIPopoverController")) {
-        _popover = [[UIPopoverController alloc] initWithContentViewController:picker];
-        _popover.delegate = self;
-        [_popover presentPopoverFromRect:_choose.bounds inView:_choose permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
-    } else {
-        [self presentViewController:picker animated:YES completion:nil];
-    }
-}
-
-- (void)closePicker {
-    if (_popover) {
-        [_popover dismissPopoverAnimated:YES];
-        _popover.delegate = nil;
-        [_popover release];
-        _popover = nil;
-    } else {
-        [self dismissViewControllerAnimated:YES completion:nil];
-    }
-}
-
-- (void)popoverControllerDidDismissPopover:(UIPopoverController *)popover {
-    if (popover == _popover) {
-        _popover.delegate = nil;
-        [_popover release];
-        _popover = nil;
-    }
-}
-
-- (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
-    (void)picker;
-    [self closePicker];
-}
-
-// a photo is decoded and cut down away from the main thread, a large one takes seconds on an old phone
-- (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info {
-    (void)picker;
-    UIImage *picture = [info objectForKey:UIImagePickerControllerOriginalImage];
-    [self closePicker];
-    if (!picture)
-        return;
-    _storing = YES;
-    [self showState];
-    [picture retain];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        BOOL stored = [YZBackground storePicture:picture];
-        [picture release];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            _storing = NO;
-            if (stored) {
-                if (_changed)
-                    _changed();
-            } else {
-                YZDialog *dialog = [YZDialog dialogWithTitle:YZT(@"Фон не сохранён") message:YZT(@"Не удалось записать фото, возможно, на устройстве нет места")
-                                                 cancelTitle:nil confirmTitle:YZT(@"Хорошо") destructive:NO handler:nil];
-                dialog.picture = [YZTheme mascotImage:@"error"];
-                [dialog showInView:self.navigationController.view];
-            }
-            [self showState];
-        });
-        [pool drain];
-    });
-}
-
-- (void)removePicture {
-    [YZBackground remove];
-    [YZTheme animateFeedbackOfView:_remove];
-    if (_changed)
-        _changed();
-    [self showState];
-}
-
-@end
-
 // the app screen: the sticker card, name, version from the bundle, a line about it and the links
+
 @implementation YZAboutController
 
 @synthesize openAddress = _openAddress;
