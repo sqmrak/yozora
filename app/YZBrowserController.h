@@ -100,6 +100,7 @@
     UIView *_bottomBar;
     UIButton *_backButton;
     UIButton *_forwardButton;
+    UIButton *_starButton;
     UIButton *_shareButton;
     UIButton *_tabsButton;
     UIButton *_menuButton;
@@ -169,6 +170,7 @@
     BOOL _shownBack;
     BOOL _shownForward;
     BOOL _shownSecure;
+    BOOL _shownBookmarked;
     BOOL _shownBlank;
 }
 - (void)pumpCore:(CADisplayLink *)link;
