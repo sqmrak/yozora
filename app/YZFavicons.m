@@ -16,8 +16,10 @@ static const NSUInteger YZIconPageLimit = YOZORA_ICON_SCAN_MAX;
 // an icon smaller than this is a placeholder, not a picture of the site
 static const CGFloat YZIconMinimumSide = 16;
 // the pictures kept by an earlier version came from a guessed file name at 128 pixels at most and are not trusted
-static NSString *const YZIconDirectoryName = @"YozoraIcons2";
+static NSString *const YZIconDirectoryName = @"YozoraIcons3";
 static NSString *const YZIconOldDirectoryName = @"YozoraIcons";
+// the pictures of the second cache kept the first one that decoded, often a 32 pixel favicon
+static NSString *const YZIconOlderDirectoryName = @"YozoraIcons2";
 static const NSTimeInterval YZIconRetry = 3 * 24 * 3600;
 
 static NSMutableDictionary *YZFaviconMemory;
@@ -32,6 +34,7 @@ static NSString *YZIconDirectory(void) {
     if (!cleaned) {
         cleaned = YES;
         [[NSFileManager defaultManager] removeItemAtPath:[[roots objectAtIndex:0] stringByAppendingPathComponent:YZIconOldDirectoryName] error:NULL];
+        [[NSFileManager defaultManager] removeItemAtPath:[[roots objectAtIndex:0] stringByAppendingPathComponent:YZIconOlderDirectoryName] error:NULL];
     }
     return [[roots objectAtIndex:0] stringByAppendingPathComponent:YZIconDirectoryName];
 }
@@ -174,12 +177,11 @@ static UIImage *YZScaledIcon(UIImage *image) {
     [YZFaviconMemory setObject:icon forKey:host];
 }
 
-+ (UIColor *)tileColorForIcon:(UIImage *)icon {
-    BOOL dark = [YZTheme isDark];
-    UIColor *card = dark ? [YZTheme cardColor] : [UIColor whiteColor];
+// how much of a 24 by 24 look at the icon is covered and how light the covered part is. false when the picture cannot be read
+static BOOL YZIconCoverage(UIImage *icon, double *coverage, double *lightness) {
     CGImageRef image = icon.CGImage;
     if (!image)
-        return card;
+        return NO;
     // the icon is looked at in a grid of 24 by 24, which is enough to tell a glyph from a filled square
     enum { side = 24 };
     unsigned char pixels[side * side * 4];
@@ -188,7 +190,7 @@ static UIImage *YZScaledIcon(UIImage *image) {
     CGContextRef context = CGBitmapContextCreate(pixels, side, side, 8, side * 4, space, kCGImageAlphaPremultipliedLast);
     CGColorSpaceRelease(space);
     if (!context)
-        return card;
+        return NO;
     CGContextSetInterpolationQuality(context, kCGInterpolationMedium);
     CGContextDrawImage(context, CGRectMake(0, 0, side, side), image);
     CGContextRelease(context);
@@ -199,16 +201,32 @@ static UIImage *YZScaledIcon(UIImage *image) {
         // premultiplied: the weight of a pixel is already in its channels
         light += 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
     }
+    *coverage = alpha / (255.0 * side * side);
+    *lightness = alpha > 0 ? light / alpha : 0;
+    return YES;
+}
+
++ (UIColor *)tileColorForIcon:(UIImage *)icon {
+    BOOL dark = [YZTheme isDark];
+    UIColor *card = dark ? [YZTheme cardColor] : [UIColor whiteColor];
+    double coverage, lightness;
     // a nearly empty picture shows nothing whatever it stands on
-    if (alpha < 255.0 * side * side * 0.02)
+    if (!YZIconCoverage(icon, &coverage, &lightness) || coverage < 0.02 || coverage > 0.9)
         return card;
-    double coverage = alpha / (255.0 * side * side);
-    if (coverage > 0.9)
-        return card;
-    double lightness = light / alpha;
     if (dark)
         return lightness < 0.30 ? [UIColor colorWithRed:0.93f green:0.93f blue:0.94f alpha:1] : card;
     return lightness > 0.85 ? [UIColor colorWithRed:0.16f green:0.16f blue:0.18f alpha:1] : card;
+}
+
++ (YZIconShape)shapeOfIcon:(UIImage *)icon {
+    CGFloat pixels = MIN(icon.size.width, icon.size.height) * icon.scale;
+    double coverage, lightness;
+    // a home screen picture is a square that fills its tile, the way the shortcuts of Firefox show it. a small one is not blown up
+    if (pixels < 64)
+        return YZIconShapeSmall;
+    if (pixels >= 96 && YZIconCoverage(icon, &coverage, &lightness) && coverage > 0.97)
+        return YZIconShapeFull;
+    return YZIconShapeGlyph;
 }
 
 // popular sites draw their own colored mark from the bundle: the page of Google offers a 16 pixel favicon and a blurred one comes out of it,
@@ -273,33 +291,147 @@ static UIImage *YZBundledSiteIcon(NSString *host) {
     return nil;
 }
 
-// candidate addresses, best first: what the page declares (the largest, home screen pictures before plain
-// icons at equal size), then the file names that sites keep at the root, a favicon.ico last. the first that
-// answers with a picture wins, at most 4 declared ones and the 3 root names are asked
-+ (NSArray *)candidatesForHost:(NSString *)host page:(NSData *)page pageURL:(NSURL *)pageURL {
-    NSMutableArray *list = [NSMutableArray array];
-    if ([page length] && pageURL) {
-        yozora_icon_link links[YOZORA_ICON_LINKS_MAX];
-        size_t count = yozora_icon_links([page bytes], [page length], [[pageURL absoluteString] UTF8String], links, 4);
-        for (size_t i = 0; i < count; ++i) {
-            NSString *address = [NSString stringWithUTF8String:links[i].url];
-            // only https is asked, the same rule as for the page
-            if ([address hasPrefix:@"https://"] && address && ![list containsObject:address])
-                [list addObject:address];
+// the page of the site for the icons: a mobile host (m.youtube.com) declares a 32 pixel favicon, the site behind it declares the home screen
+// pictures and a manifest
+static NSString *YZIconPageHost(NSString *host) {
+    for (NSString *prefix in [NSArray arrayWithObjects:@"m.", @"mobile.", @"touch.", nil]) {
+        if ([host hasPrefix:prefix] && [[host substringFromIndex:[prefix length]] rangeOfString:@"."].location != NSNotFound)
+            return [host substringFromIndex:[prefix length]];
+    }
+    return host;
+}
+
+// a picture of this many pixels on its side is sharp on a tile of 60 points at 2 times, a smaller one makes the search go on
+static const CGFloat YZIconGoodSide = 128;
+// the icons of a manifest, the one that sites keep for installing a page as an app: 192 and 512 pixel pictures that no <link> declares
+static const NSUInteger YZIconManifestLimit = 262144;
+static const size_t YZIconCandidatesMax = 8;
+
+static CGFloat YZPixelSide(UIImage *icon) {
+    return MIN(icon.size.width, icon.size.height) * icon.scale;
+}
+
+// the largest side of a "sizes" text such as "192x192" or "48x48 96x96", 0 when it says nothing useful ("any" is a vector picture)
+static unsigned YZLargestSize(NSString *sizes) {
+    unsigned largest = 0;
+    for (NSString *part in [sizes componentsSeparatedByString:@" "]) {
+        NSArray *pair = [[part lowercaseString] componentsSeparatedByString:@"x"];
+        if ([pair count] == 2)
+            largest = MAX(largest, (unsigned)MAX([[pair objectAtIndex:0] intValue], [[pair objectAtIndex:1] intValue]));
+    }
+    return largest;
+}
+
+// the address of the manifest a page declares with <link rel="manifest">, nil when it has none
+static NSURL *YZManifestURL(NSData *page, NSURL *pageURL) {
+    NSString *head = [[[NSString alloc] initWithBytes:[page bytes] length:MIN([page length], (NSUInteger)YZIconPageLimit) encoding:NSUTF8StringEncoding] autorelease];
+    if (!head)
+        return nil;
+    NSRegularExpression *tag = [NSRegularExpression regularExpressionWithPattern:@"<link\\s[^>]*>" options:NSRegularExpressionCaseInsensitive error:NULL];
+    NSRegularExpression *rel = [NSRegularExpression regularExpressionWithPattern:@"rel\\s*=\\s*[\"']?manifest[\"'\\s>]" options:NSRegularExpressionCaseInsensitive error:NULL];
+    NSRegularExpression *href = [NSRegularExpression regularExpressionWithPattern:@"href\\s*=\\s*[\"']([^\"']+)[\"']" options:NSRegularExpressionCaseInsensitive error:NULL];
+    for (NSTextCheckingResult *match in [tag matchesInString:head options:0 range:NSMakeRange(0, [head length])]) {
+        NSString *text = [head substringWithRange:match.range];
+        if (![rel firstMatchInString:text options:0 range:NSMakeRange(0, [text length])])
+            continue;
+        NSTextCheckingResult *link = [href firstMatchInString:text options:0 range:NSMakeRange(0, [text length])];
+        if (link) {
+            NSURL *resolved = [NSURL URLWithString:[text substringWithRange:[link rangeAtIndex:1]] relativeToURL:pageURL];
+            return [[resolved absoluteURL] scheme] ? [resolved absoluteURL] : nil;
         }
     }
+    return nil;
+}
+
+// candidate addresses, largest first: what the page declares and what its manifest lists (home screen pictures before plain icons at equal
+// size), then the file names that sites keep at the root, a favicon.ico last. only https is asked, at most 8 are tried and the search stops
+// at the first picture that is sharp (128 pixels), else the largest one found is kept. runs on the icon queue: the manifest is read here
++ (NSArray *)candidatesForHost:(NSString *)host page:(NSData *)page pageURL:(NSURL *)pageURL {
+    NSMutableArray *found = [NSMutableArray array];
+    if ([page length] && pageURL) {
+        yozora_icon_link links[YOZORA_ICON_LINKS_MAX];
+        size_t count = yozora_icon_links([page bytes], [page length], [[pageURL absoluteString] UTF8String], links, YOZORA_ICON_LINKS_MAX);
+        for (size_t i = 0; i < count; ++i) {
+            NSString *address = [NSString stringWithUTF8String:links[i].url];
+            if (address)
+                [found addObject:[NSArray arrayWithObjects:address, [NSNumber numberWithUnsignedInt:links[i].size], [NSNumber numberWithInt:links[i].touch], nil]];
+        }
+        NSURL *manifest = YZManifestURL(page, pageURL);
+        if ([[manifest scheme] isEqualToString:@"https"]) {
+            NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:manifest cachePolicy:NSURLRequestUseProtocolCachePolicy timeoutInterval:6];
+            NSURLResponse *response = nil;
+            NSData *data = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:NULL];
+            id json = [data length] && [data length] <= YZIconManifestLimit ? [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL] : nil;
+            NSArray *icons = [json isKindOfClass:[NSDictionary class]] ? [json objectForKey:@"icons"] : nil;
+            if ([icons isKindOfClass:[NSArray class]]) {
+                for (id icon in icons) {
+                    if (![icon isKindOfClass:[NSDictionary class]] || [[icon objectForKey:@"src"] isKindOfClass:[NSString class]] == NO)
+                        continue;
+                    // a vector or a monochrome mask is no picture of the site
+                    NSString *purpose = [icon objectForKey:@"purpose"];
+                    if ([purpose isKindOfClass:[NSString class]] && [purpose rangeOfString:@"any"].location == NSNotFound && [purpose length])
+                        continue;
+                    NSString *type = [icon objectForKey:@"type"];
+                    if ([type isKindOfClass:[NSString class]] && [type rangeOfString:@"svg"].location != NSNotFound)
+                        continue;
+                    NSString *sizes = [icon objectForKey:@"sizes"];
+                    NSURL *resolved = [[NSURL URLWithString:[icon objectForKey:@"src"] relativeToURL:[response URL] ? [response URL] : manifest] absoluteURL];
+                    NSString *address = [resolved absoluteString];
+                    if (address)
+                        [found addObject:[NSArray arrayWithObjects:address, [NSNumber numberWithUnsignedInt:[sizes isKindOfClass:[NSString class]] ? YZLargestSize(sizes) : 0],
+                                          [NSNumber numberWithInt:1], nil]];
+                }
+            }
+        }
+    }
+    // the largest first, a home screen picture before a plain one of the same size, the order of the page otherwise
+    NSArray *sorted = [found sortedArrayWithOptions:NSSortStable usingComparator:^NSComparisonResult(NSArray *a, NSArray *b) {
+        unsigned left = [[a objectAtIndex:1] unsignedIntValue], right = [[b objectAtIndex:1] unsignedIntValue];
+        if (left != right)
+            return left > right ? NSOrderedAscending : NSOrderedDescending;
+        int touchA = [[a objectAtIndex:2] intValue], touchB = [[b objectAtIndex:2] intValue];
+        return touchA == touchB ? NSOrderedSame : (touchA > touchB ? NSOrderedAscending : NSOrderedDescending);
+    }];
+    NSMutableArray *list = [NSMutableArray array];
+    for (NSArray *entry in sorted) {
+        NSString *address = [entry objectAtIndex:0];
+        if ([address hasPrefix:@"https://"] && ![list containsObject:address])
+            [list addObject:address];
+    }
+    NSString *pageHost = YZIconPageHost(host);
     for (NSString *path in [NSArray arrayWithObjects:@"apple-touch-icon.png", @"apple-touch-icon-precomposed.png", @"favicon.ico", nil]) {
-        NSString *address = [NSString stringWithFormat:@"https://%@/%@", host, path];
+        NSString *address = [NSString stringWithFormat:@"https://%@/%@", pageHost, path];
         if (![list containsObject:address])
             [list addObject:address];
     }
+    if ([list count] > YZIconCandidatesMax)
+        [list removeObjectsInRange:NSMakeRange(YZIconCandidatesMax, [list count] - YZIconCandidatesMax)];
     return list;
 }
 
-// a refusal moves on to the next candidate, a failed connection stops (it may be the network) and is not
-// remembered
-+ (void)fetchCandidates:(NSArray *)candidates index:(NSUInteger)index host:(NSString *)host file:(NSString *)file absent:(NSString *)absent refused:(BOOL)refused {
++ (void)finishHost:(NSString *)host icon:(UIImage *)icon file:(NSString *)file {
+    NSData *png = UIImagePNGRepresentation(icon);
+    NSFileManager *files = [NSFileManager defaultManager];
+    NSDictionary *mode = [NSDictionary dictionaryWithObject:[NSNumber numberWithUnsignedLong:0700] forKey:NSFilePosixPermissions];
+    [files createDirectoryAtPath:[file stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:mode error:NULL];
+    if (png)
+        [png writeToFile:file options:NSDataWritingAtomic error:NULL];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [YZIconPending removeObject:host];
+        [YZFavicons storeInMemory:icon forHost:host];
+        [[NSNotificationCenter defaultCenter] postNotificationName:YZFaviconDidLoadNotification object:[YZFavicons class]
+                                                          userInfo:[NSDictionary dictionaryWithObject:host forKey:@"host"]];
+    });
+}
+
+// a refusal moves on to the next candidate, a failed connection stops (it may be the network) and is not remembered. a picture under 128
+// pixels is kept as the best so far and the search goes on, the largest one found is what stays
++ (void)fetchCandidates:(NSArray *)candidates index:(NSUInteger)index host:(NSString *)host file:(NSString *)file absent:(NSString *)absent refused:(BOOL)refused best:(UIImage *)best {
     if (index >= [candidates count]) {
+        if (best) {
+            [self finishHost:host icon:best file:file];
+            return;
+        }
         NSFileManager *files = [NSFileManager defaultManager];
         NSDictionary *mode = [NSDictionary dictionaryWithObject:[NSNumber numberWithUnsignedLong:0700] forKey:NSFilePosixPermissions];
         [files createDirectoryAtPath:[file stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:mode error:NULL];
@@ -318,26 +450,20 @@ static UIImage *YZBundledSiteIcon(NSString *host) {
         if (!error && status == 200 && [data length] && [data length] <= YZIconBytesLimit)
             icon = YZScaledIcon([UIImage imageWithData:data]);
         if (!icon) {
-            if (error) {
+            if (error && !best) {
                 // the network failed: nothing is remembered, the next ask tries again
                 dispatch_async(dispatch_get_main_queue(), ^{ [YZIconPending removeObject:host]; });
                 return;
             }
-            [self fetchCandidates:candidates index:index + 1 host:host file:file absent:absent refused:YES];
+            [self fetchCandidates:candidates index:index + 1 host:host file:file absent:absent refused:YES best:best];
             return;
         }
-        NSData *png = UIImagePNGRepresentation(icon);
-        NSFileManager *files = [NSFileManager defaultManager];
-        NSDictionary *mode = [NSDictionary dictionaryWithObject:[NSNumber numberWithUnsignedLong:0700] forKey:NSFilePosixPermissions];
-        [files createDirectoryAtPath:[file stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:mode error:NULL];
-        if (png)
-            [png writeToFile:file options:NSDataWritingAtomic error:NULL];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [YZIconPending removeObject:host];
-            [YZFavicons storeInMemory:icon forHost:host];
-            [[NSNotificationCenter defaultCenter] postNotificationName:YZFaviconDidLoadNotification object:[YZFavicons class]
-                                                              userInfo:[NSDictionary dictionaryWithObject:host forKey:@"host"]];
-        });
+        UIImage *kept = (!best || YZPixelSide(icon) > YZPixelSide(best)) ? icon : best;
+        if (YZPixelSide(kept) >= YZIconGoodSide) {
+            [self finishHost:host icon:kept file:file];
+            return;
+        }
+        [self fetchCandidates:candidates index:index + 1 host:host file:file absent:absent refused:YES best:kept];
     }];
 }
 
@@ -351,7 +477,7 @@ static UIImage *YZBundledSiteIcon(NSString *host) {
         YZIconQueue = [[NSOperationQueue alloc] init];
         YZIconQueue.maxConcurrentOperationCount = 2;
     }
-    NSURL *root = [NSURL URLWithString:[NSString stringWithFormat:@"https://%@/", host]];
+    NSURL *root = [NSURL URLWithString:[NSString stringWithFormat:@"https://%@/", YZIconPageHost(host)]];
     // the page is read on the main run loop, the rest happens on the icon queue
     dispatch_async(dispatch_get_main_queue(), ^{
         [[[YZIconPage alloc] initWithURL:root done:^(NSData *page, NSURL *finalURL, BOOL failed) {
@@ -361,7 +487,7 @@ static UIImage *YZBundledSiteIcon(NSString *host) {
                 return;
             }
             [YZIconQueue addOperationWithBlock:^{
-                [self fetchCandidates:[self candidatesForHost:host page:page pageURL:finalURL] index:0 host:host file:file absent:absent refused:NO];
+                [self fetchCandidates:[self candidatesForHost:host page:page pageURL:finalURL] index:0 host:host file:file absent:absent refused:NO best:nil];
             }];
         }] autorelease];
     });
