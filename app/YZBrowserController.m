@@ -15,6 +15,7 @@
 #import "YZStrings.h"
 #import "YZTab.h"
 #import "YZTheme.h"
+#include "yozora_color.h"
 #include "yozora_address.h"
 
 static NSString *const YZTabsDefaultsKey = @"YZTabs";
@@ -139,6 +140,8 @@ static UIImage *YZThumbnailFromView(UIView *view) {
 - (YZTab *)currentTab;
 - (void)layoutChrome;
 - (void)installEdgeSwipes;
+- (void)trackEdgeColorAtTime:(CFTimeInterval)now;
+- (void)setEdgeColor:(UIColor *)top bottom:(UIColor *)bottom;
 - (void)cancelEdgeSwipe;
 - (void)updateChromeForced:(BOOL)forced;
 - (void)updateAddressDisplay;
@@ -151,7 +154,6 @@ static UIImage *YZThumbnailFromView(UIView *view) {
 - (void)watchExternalLinks;
 - (void)showError:(NSString *)text;
 - (void)showHome;
-- (void)trackScrollForBars;
 - (void)setBottomBarShown:(BOOL)shown animated:(BOOL)animated;
 - (void)givePageRoomBack;
 - (void)moveTopBarAway:(BOOL)away animated:(BOOL)animated;
@@ -1516,6 +1518,27 @@ static const CGFloat YZTabStripHeight = 44;
     UIView *statusStrip = [_topBar viewWithTag:2];
     statusStrip.bounds = CGRectMake(0, 0, width, top);
     statusStrip.center = CGPointMake(width / 2, top / 2);
+    // the side that has no bar takes the color of the page as in Safari: the strip behind the notch in the bottom layout, the strip over
+    // the home indicator in the top one. the side with the bar keeps the color of the bar. until the color is known the bottom layout
+    // shows the surface of the page
+    UIColor *stripColor = [YZTheme statusStripColor];
+    if (_barsOverHome)
+        stripColor = [UIColor clearColor];
+    else if (atBottom && ![YZTheme isClassic])
+        stripColor = _edgeColor ? _edgeColor : [YZTheme surfaceColor];
+    statusStrip.backgroundColor = stripColor;
+    // the page ends above the home indicator in the top layout
+    BOOL footShown = !_barsOverHome && atTop && ![YZTheme isClassic] && _edgeBottomColor && bottom > 0 && _keyboardHeight <= 0 && !_editing;
+    if (footShown && !_footStrip) {
+        _footStrip = [[UIView alloc] initWithFrame:CGRectZero];
+        _footStrip.userInteractionEnabled = NO;
+        [self.view insertSubview:_footStrip aboveSubview:_bottomBar];
+    }
+    _footStrip.hidden = !footShown;
+    if (footShown) {
+        _footStrip.backgroundColor = _edgeBottomColor;
+        _footStrip.frame = CGRectMake(0, height - bottom, width, bottom);
+    }
     _tabStrip.hidden = !wide;
     _tabStrip.frame = CGRectMake(insets.left, top, inner, strip);
     // the buttons live in the bottom bar of a phone and in the toolbar of a wide screen
@@ -1972,7 +1995,7 @@ static const CGFloat YZTabStripHeight = 44;
     while (_core && yozora_core_take_media(_core, &media))
         [self handleMedia:&media];
     [_pageView advanceFlingAtTime:link.timestamp];
-    [self trackScrollForBars];
+    [self trackEdgeColorAtTime:link.timestamp];
     [_pageView updateInput];
     if ([_pageView isFirstResponder] != _pageEditing) {
         _pageEditing = [_pageView isFirstResponder];
@@ -2014,7 +2037,9 @@ static const CGFloat YZTabStripHeight = 44;
             // the language of the page is found once it has loaded
             if (![[self currentTab] isBlank])
                 [[self currentTab].translation pageDidLoad];
+            _edgeSampleDue = link.timestamp + 0.3;
         } else if (state == YOZORA_LOAD_LOADING) {
+            [self setEdgeColor:nil bottom:nil];
             [[self currentTab].translation cancel];
             // a new page starts at its own size, like in Safari
             [_pageView resetZoom];
@@ -2335,6 +2360,111 @@ static const CGFloat YZEdgeKeySize = 44;
     }];
 }
 
+#pragma mark edge color
+
+// the colors the page has at the top and at the bottom of the screen, one on each line: the theme-color of the page for the top, else the
+// first background that is not transparent from the element at the edge up to the root. an unknown color is an empty line
+static NSString *const YZEdgeColorScript =
+    @"(function(){function ok(c){return c&&c!=='transparent'&&!/^rgba\\(\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*0\\s*\\)$/.test(c);}"
+    "function at(y){var e=document.elementFromPoint(Math.floor(innerWidth/2),y);while(e){var c=getComputedStyle(e).backgroundColor;if(ok(c))return c;e=e.parentElement;}return '';}"
+    "var m=document.querySelector('meta[name=\"theme-color\"]');"
+    "return ((m&&m.content)?m.content:at(1))+'\\n'+at(innerHeight-2);})()";
+
+// rgb(), rgba() and hex forms, what a computed style and a theme-color give. a color that is mostly transparent is not one
+static UIColor *YZColorFromCSS(NSString *text) {
+    text = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([text length] < 4 || [text length] > 64)
+        return nil;
+    if ([text hasPrefix:@"#"]) {
+        NSString *hex = [text substringFromIndex:1];
+        if ([hex length] == 3) {
+            NSMutableString *wide = [NSMutableString string];
+            for (NSUInteger i = 0; i < 3; ++i)
+                [wide appendFormat:@"%C%C", [hex characterAtIndex:i], [hex characterAtIndex:i]];
+            hex = wide;
+        }
+        uint8_t rgb[3];
+        if ([hex length] != 6 || !yozora_color_parse_hex([[@"#" stringByAppendingString:hex] UTF8String], 7, rgb))
+            return nil;
+        return [UIColor colorWithRed:rgb[0] / 255.0f green:rgb[1] / 255.0f blue:rgb[2] / 255.0f alpha:1];
+    }
+    if (![text hasPrefix:@"rgb"])
+        return nil;
+    NSMutableArray *numbers = [NSMutableArray array];
+    NSScanner *scanner = [NSScanner scannerWithString:text];
+    [scanner scanUpToCharactersFromSet:[NSCharacterSet decimalDigitCharacterSet] intoString:NULL];
+    while (![scanner isAtEnd] && [numbers count] < 4) {
+        double value;
+        if (![scanner scanDouble:&value])
+            break;
+        [numbers addObject:[NSNumber numberWithDouble:value]];
+        [scanner scanUpToCharactersFromSet:[NSCharacterSet decimalDigitCharacterSet] intoString:NULL];
+    }
+    if ([numbers count] < 3)
+        return nil;
+    double alpha = [numbers count] > 3 ? [[numbers objectAtIndex:3] doubleValue] : 1;
+    if (alpha < 0.5)
+        return nil;
+    return [UIColor colorWithRed:MIN(255.0, [[numbers objectAtIndex:0] doubleValue]) / 255.0f
+                           green:MIN(255.0, [[numbers objectAtIndex:1] doubleValue]) / 255.0f
+                            blue:MIN(255.0, [[numbers objectAtIndex:2] doubleValue]) / 255.0f alpha:1];
+}
+
+- (void)setEdgeColor:(UIColor *)top bottom:(UIColor *)bottom {
+    BOOL same = (top == _edgeColor || (top && _edgeColor && [top isEqual:_edgeColor]))
+        && (bottom == _edgeBottomColor || (bottom && _edgeBottomColor && [bottom isEqual:_edgeBottomColor]));
+    if (same)
+        return;
+    NSLog(@"yozora: page edge colors top %@ bottom %@", top, bottom);
+    [top retain];
+    [_edgeColor release];
+    _edgeColor = top;
+    [bottom retain];
+    [_edgeBottomColor release];
+    _edgeBottomColor = bottom;
+    [UIView animateWithDuration:[YZTheme animationsEnabled] ? 0.2 : 0 animations:^{ [self layoutChrome]; }];
+    // the clock and the icons follow the page: dark over a light color, light over a dark one. ios before 13 take the style from the
+    // application, later ones ask the controller
+    [[UIApplication sharedApplication] setStatusBarStyle:[self preferredStatusBarStyle]];
+    SEL update = NSSelectorFromString(@"setNeedsStatusBarAppearanceUpdate");
+    if ([self respondsToSelector:update])
+        [self performSelector:update];
+}
+
+// the page is asked after a load and a moment after the scroll stopped, a page is not asked while it moves
+- (void)trackEdgeColorAtTime:(CFTimeInterval)now {
+    if (!_core || [YZTheme isClassic] || [[self currentTab] isBlank]) {
+        _edgeSampleDue = 0;
+        [self setEdgeColor:nil bottom:nil];
+        return;
+    }
+    int scroll = yozora_core_scroll_y(_core);
+    if (scroll != _edgeScroll) {
+        _edgeScroll = scroll;
+        _edgeSampleDue = now + 0.35;
+    }
+    if (!_edgeSampleDue || now < _edgeSampleDue || _edgeSampling || yozora_core_state(_core) != YOZORA_LOAD_COMPLETE)
+        return;
+    _edgeSampleDue = 0;
+    YZTab *tab = [[self currentTab] retain];
+    if (!tab.translation) {
+        [tab release];
+        return;
+    }
+    _edgeSampling = YES;
+    [tab.translation runScript:YZEdgeColorScript completion:^(NSString *answer) {
+        _edgeSampling = NO;
+        if (tab == [self currentTab] && _core && yozora_core_state(_core) == YOZORA_LOAD_COMPLETE)
+        {
+            NSArray *lines = [answer componentsSeparatedByString:@"\n"];
+            UIColor *top = [lines count] > 0 ? YZColorFromCSS([lines objectAtIndex:0]) : nil;
+            UIColor *bottom = [lines count] > 1 ? YZColorFromCSS([lines objectAtIndex:1]) : nil;
+            [self setEdgeColor:top bottom:bottom];
+        }
+        [tab release];
+    }];
+}
+
 - (void)reloadPressed {
     if (!_core)
         return;
@@ -2520,6 +2650,11 @@ static const CGFloat YZEdgeKeySize = 44;
 
 // ios 13 and later ignore UIApplication setStatusBarStyle when the controller owns the status bar
 - (UIStatusBarStyle)preferredStatusBarStyle {
+    if (_edgeColor && ([self layoutAtBottom] || _barsOverHome) && ![YZTheme isClassic]) {
+        CGFloat red, green, blue, alpha;
+        if ([_edgeColor getRed:&red green:&green blue:&blue alpha:&alpha])
+            return YZStatusBarStyle(0.299f * red + 0.587f * green + 0.114f * blue <= 0.55f);
+    }
     return [YZTheme statusBarStyle];
 }
 
@@ -2541,7 +2676,7 @@ static const CGFloat YZEdgeKeySize = 44;
     [_tabStripSignature release];
     _tabStripSignature = nil;
     [self refreshTabStrip];
-    [_topBar viewWithTag:2].backgroundColor = [YZTheme statusStripColor];
+    [self.view setNeedsLayout];
     [(YZSystemBarView *)_bottomBar applyTheme];
     [_bottomBar viewWithTag:YZBottomSkirtTag].backgroundColor = [YZTheme toolbarColor];
     [self styleField];
@@ -3380,6 +3515,9 @@ static UIImage *YZMicImage(CGFloat size, UIColor *color) {
 
 - (void)dealloc {
     [NSObject cancelPreviousPerformRequestsWithTarget:self];
+    [_edgeColor release];
+    [_edgeBottomColor release];
+    [_footStrip release];
     _edgeBack.delegate = nil;
     _edgeForward.delegate = nil;
     [_edgeBack release];

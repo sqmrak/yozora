@@ -149,6 +149,14 @@
     UIView *_edgeKey;
     BOOL _edgeArmed;
     BOOL _edgeClipped;
+    // the color of the page at the top of the screen, which the strip behind the notch takes in the bottom layout as it does in Safari
+    UIColor *_edgeColor;
+    // the same at the bottom edge, the strip over the home indicator takes it
+    UIColor *_edgeBottomColor;
+    UIView *_footStrip;
+    int _edgeScroll;
+    CFTimeInterval _edgeSampleDue;
+    BOOL _edgeSampling;
     dispatch_queue_t _saveQueue;
 
     // what the chrome currently shows, so a frame only touches views whose value changed

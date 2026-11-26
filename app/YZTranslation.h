@@ -57,6 +57,9 @@ typedef enum {
 - (void)showOriginal;
 /* stops what is running and goes back to nothing, for a page that is gone or a person who dismissed the offer */
 - (void)cancel;
+/* runs a script in the isolated world of the page on the queue of the translation and gives its string answer on the main
+   queue, nil when it threw or the core went away in the meantime */
+- (void)runScript:(NSString *)script completion:(void (^)(NSString *answer))completion;
 /* the core is going away */
 - (void)invalidate;
 @end

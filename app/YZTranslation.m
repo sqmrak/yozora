@@ -92,6 +92,28 @@ static NSString *YZLiteral(NSString *text) {
     _core = NULL;
 }
 
+- (void)runScript:(NSString *)script completion:(void (^)(NSString *answer))completion {
+    if (!_valid || !_core) {
+        completion(nil);
+        return;
+    }
+    yozora_core *core = _core;
+    void (^done)(NSString *) = [completion copy];
+    [self retain];
+    dispatch_async(_queue, ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        char *answer = yozora_core_run_script(core, [script UTF8String]);
+        NSString *text = answer ? [NSString stringWithUTF8String:answer] : nil;
+        free(answer);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            done(_valid ? text : nil);
+            [done release];
+            [self release];
+        });
+        [pool release];
+    });
+}
+
 - (void)cancel {
     ++_generation;
     if (_phase != YZTranslationIdle)
