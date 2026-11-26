@@ -32,6 +32,7 @@
 
 @interface YZUpdateCard : UIView {
     UIView *_card;
+    UIScrollView *_scroll;
     YZUpdatePanel *_panel;
 }
 /* one card at a time */

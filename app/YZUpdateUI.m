@@ -8,7 +8,7 @@
 #import "YZWaveSeekBar.h"
 #import <QuartzCore/QuartzCore.h>
 
-enum { YZItemSticker, YZItemLabel, YZItemProgress, YZItemButton, YZItemButtonPair };
+enum { YZItemSticker, YZItemLabel, YZItemProgress, YZItemButton };
 enum { YZActionLater = 1, YZActionPrimary, YZActionCancel, YZActionRefresh, YZActionOpenIn };
 
 static NSString *YZVersionText(NSString *tag) {
@@ -147,22 +147,16 @@ static void YZFillRounded(CGContextRef context, CGRect rect, CGFloat radius, CGG
 }
 
 - (void)add:(UIView *)view kind:(int)kind gap:(CGFloat)gap {
-    [self add:view second:nil kind:kind gap:gap];
-}
-
-- (void)add:(UIView *)view second:(UIView *)second kind:(int)kind gap:(CGFloat)gap {
-    NSMutableDictionary *item = [NSMutableDictionary dictionaryWithObjectsAndKeys:view, @"view", [NSNumber numberWithInt:kind], @"kind", [NSNumber numberWithDouble:gap], @"gap", nil];
-    if (second)
-        [item setObject:second forKey:@"second"];
+    NSDictionary *item = [NSDictionary dictionaryWithObjectsAndKeys:view, @"view", [NSNumber numberWithInt:kind], @"kind", [NSNumber numberWithDouble:gap], @"gap", nil];
     [_items addObject:item];
     [self addSubview:view];
-    if (second)
-        [self addSubview:second];
 }
 
 - (UIButton *)buttonWithTitle:(NSString *)title action:(int)action primary:(BOOL)primary {
     UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
     button.titleLabel.font = [YZTheme boldSystemFontOfSize:16];
+    YZShrinkToFit(button.titleLabel);
+    button.contentEdgeInsets = UIEdgeInsetsMake(0, 12, 0, 12);
     button.tag = action;
     [button setTitle:title forState:UIControlStateNormal];
     UIColor *color = primary ? [YZTheme accentColor] : [YZTheme stateColor];
@@ -222,10 +216,8 @@ static void YZFillRounded(CGContextRef context, CGRect rect, CGFloat radius, CGG
 }
 
 - (void)rebuild {
-    for (NSDictionary *item in _items) {
+    for (NSDictionary *item in _items)
         [[item objectForKey:@"view"] removeFromSuperview];
-        [[item objectForKey:@"second"] removeFromSuperview];
-    }
     [_items removeAllObjects];
     [_progress release];
     _progress = nil;
@@ -271,35 +263,27 @@ static void YZFillRounded(CGContextRef context, CGRect rect, CGFloat radius, CGG
     }
     NSMutableArray *buttons = [NSMutableArray array];
     if (state == YZUpdaterIdle && newer) {
+        [buttons addObject:[self buttonWithTitle:install ? YZT(@"Установить обновление") : YZT(@"Открыть релиз") action:YZActionPrimary primary:YES]];
         if (_compact)
             [buttons addObject:[self buttonWithTitle:YZT(@"Позже") action:YZActionLater primary:NO]];
-        [buttons addObject:[self buttonWithTitle:install ? YZT(@"Установить обновление") : YZT(@"Открыть релиз") action:YZActionPrimary primary:YES]];
-        if (!_compact)
+        else
             [buttons addObject:[self buttonWithTitle:YZT(@"Проверить снова") action:YZActionRefresh primary:NO]];
     } else if (state == YZUpdaterIdle && !_compact && !checking) {
         [buttons addObject:[self buttonWithTitle:YZT(@"Проверить снова") action:YZActionRefresh primary:NO]];
     } else if (state == YZUpdaterWorking) {
         [buttons addObject:[self buttonWithTitle:YZT(@"Отмена") action:YZActionCancel primary:NO]];
     } else if (state == YZUpdaterFailed) {
+        [buttons addObject:[self buttonWithTitle:YZT(@"Повторить") action:YZActionPrimary primary:YES]];
         if (_compact)
             [buttons addObject:[self buttonWithTitle:YZT(@"Закрыть") action:YZActionLater primary:NO]];
-        [buttons addObject:[self buttonWithTitle:YZT(@"Повторить") action:YZActionPrimary primary:YES]];
     }
     if (updater.hasFile)
         [buttons addObject:[self buttonWithTitle:YZT(@"Открыть в…") action:YZActionOpenIn primary:NO]];
     BOOL notesFirst = !_compact;
     if (!notesFirst)
         [self addNotes:release subtle:subtle text:text];
-    for (NSUInteger i = 0; i < [buttons count]; ++i) {
-        UIButton *first = [buttons objectAtIndex:i];
-        BOOL pair = _compact && i == 0 && [buttons count] >= 2 && first.tag == YZActionLater;
-        if (pair) {
-            [self add:first second:[buttons objectAtIndex:i + 1] kind:YZItemButtonPair gap:i == 0 ? 20 : 8];
-            ++i;
-        } else {
-            [self add:first kind:YZItemButton gap:i == 0 ? 20 : 8];
-        }
-    }
+    for (NSUInteger i = 0; i < [buttons count]; ++i)
+        [self add:[buttons objectAtIndex:i] kind:YZItemButton gap:i == 0 ? 20 : 8];
     if (notesFirst)
         [self addNotes:release subtle:subtle text:text];
 }
@@ -345,7 +329,7 @@ static void YZFillRounded(CGContextRef context, CGRect rect, CGFloat radius, CGG
         return 0;
     CGFloat y = 0;
     for (NSDictionary *item in _items) {
-        UIView *view = [item objectForKey:@"view"], *second = [item objectForKey:@"second"];
+        UIView *view = [item objectForKey:@"view"];
         int kind = [[item objectForKey:@"kind"] intValue];
         y += [[item objectForKey:@"gap"] doubleValue];
         CGFloat height = 0;
@@ -369,13 +353,6 @@ static void YZFillRounded(CGContextRef context, CGRect rect, CGFloat radius, CGG
             height = 46;
             view.frame = CGRectMake(0, y, width, height);
             break;
-        case YZItemButtonPair: {
-            height = 46;
-            CGFloat half = floor((width - 10) / 2);
-            view.frame = CGRectMake(0, y, half, height);
-            second.frame = CGRectMake(half + 10, y, width - half - 10, height);
-            break;
-        }
         }
         y += height;
     }
@@ -414,17 +391,22 @@ static YZUpdateCard *YZActiveCard;
     [plate applyTheme];
     _card = plate;
     [self addSubview:_card];
+    _scroll = [[UIScrollView alloc] initWithFrame:CGRectZero];
+    _scroll.showsHorizontalScrollIndicator = NO;
+    _scroll.alwaysBounceVertical = NO;
+    [_card addSubview:_scroll];
     _panel = [[YZUpdatePanel alloc] initWithFrame:CGRectZero];
     _panel.compact = YES;
     __block YZUpdateCard *card = self;
     _panel.later = ^{ [card dismiss]; };
     _panel.resize = ^{ [card setNeedsLayout]; };
-    [_card addSubview:_panel];
+    [_scroll addSubview:_panel];
     return self;
 }
 
 - (void)dealloc {
     [_card release];
+    [_scroll release];
     [_panel release];
     [super dealloc];
 }
@@ -445,10 +427,14 @@ static YZUpdateCard *YZActiveCard;
     CGFloat maxHeight = self.bounds.size.height - 32;
     if (height > maxHeight)
         height = maxHeight;
+    CGFloat innerHeight = MAX(0, height - 2 * pad);
     CGAffineTransform held = _card.transform;
     _card.transform = CGAffineTransformIdentity;
     _card.frame = CGRectMake(floor((self.bounds.size.width - width) / 2), floor((self.bounds.size.height - height) / 2), width, height);
-    _panel.frame = CGRectMake(pad, pad, inner, MAX(0, height - 2 * pad));
+    _scroll.frame = CGRectMake(pad, pad, inner, innerHeight);
+    _panel.frame = CGRectMake(0, 0, inner, content);
+    _scroll.contentSize = CGSizeMake(inner, content);
+    _scroll.scrollEnabled = content > innerHeight + 1;
     _card.transform = held;
 }
 
