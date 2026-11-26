@@ -1,6 +1,7 @@
 #import <UIKit/UIKit.h>
 #import <QuartzCore/QuartzCore.h>
 #import "YZHomeView.h"
+#import "YZVoiceInput.h"
 #import "YZListController.h"
 #import "YZMenuView.h"
 #import "YZPopupMenu.h"
@@ -90,6 +91,11 @@
     UIImageView *_securityView;
     UITextField *_input;
     UIButton *_reloadButton;
+    // dictation in the address field, shown on a blank page and while the address is edited when the system can recognize speech
+    UIButton *_micButton;
+    YZVoiceInput *_voice;
+    BOOL _voiceKnown;
+    BOOL _voiceAvailable;
     UIButton *_cancelButton;
     UIView *_bottomBar;
     UIButton *_backButton;
@@ -107,7 +113,6 @@
     YZDebugOverlay *_debugOverlay;
     // page translation: the card at the bottom of the page, the button in the address field, and what the card was last told to hide
     YZTranslateBar *_translateBar;
-    UIButton *_translateButton;
     BOOL _translateBarShown;
     int _translateBarDismissedPhase;
     // close times of the translate offer, three in ten minutes stop it coming by itself

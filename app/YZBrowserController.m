@@ -321,16 +321,16 @@ static UIImage *YZThumbnailFromView(UIView *view) {
     [_reloadButton addTarget:self action:@selector(reloadPressed) forControlEvents:UIControlEventTouchUpInside];
     YZMotionAttachBounce(_reloadButton, 0.1f);
     [_field addSubview:_reloadButton];
+    _micButton = [[YZStateButton buttonWithType:UIButtonTypeCustom] retain];
+    [(YZStateButton *)_micButton setPillSize:CGSizeMake(32, 32)];
+    [_micButton addTarget:self action:@selector(micPressed) forControlEvents:UIControlEventTouchUpInside];
+    _micButton.accessibilityLabel = YZT(@"Голосовой поиск");
+    _micButton.hidden = YES;
+    [self paintMic:NO];
+    [_field addSubview:_micButton];
 
-    // the translation of the page: a glyph in the field that appears when there is something to do, and a card at the bottom of the page
-    _translateButton = [[YZStateButton buttonWithType:UIButtonTypeCustom] retain];
-    [(YZStateButton *)_translateButton setPillSize:CGSizeMake(32, 32)];
-    [_translateButton addTarget:self action:@selector(translateButtonPressed) forControlEvents:UIControlEventTouchUpInside];
-    YZMotionAttachBounce(_translateButton, 0.1f);
-    _translateButton.hidden = YES;
-    _translateButton.accessibilityLabel = YZT(@"Перевод страницы");
-    [_field addSubview:_translateButton];
-    _translateBar = [[YZTranslateBar alloc] initWithFrame:CGRectZero];
+    // the translation of the page: a card at the bottom of the page, the menu starts it by hand
+        _translateBar = [[YZTranslateBar alloc] initWithFrame:CGRectZero];
     _translateBar.delegate = self;
     // grows from its bottom edge so the card does not overshoot upward as a whole
     _translateBar.layer.anchorPoint = CGPointMake(0.5f, 1);
@@ -1106,7 +1106,6 @@ static void YZOpenInOtherApp(NSURL *url, BOOL universalOnly, void (^done)(BOOL o
     }
     [_errorPopup release];
     [_translateBar release];
-    [_translateButton release];
     _errorPopup = [[YZErrorPopup alloc] initWithFrame:self.view.bounds];
     _errorPopup.titleText = YZT(@"Ошибка");
     _errorPopup.messageText = text;
@@ -1130,40 +1129,17 @@ static void YZOpenInOtherApp(NSURL *url, BOOL universalOnly, void (^done)(BOOL o
     return ![[self currentTab] isPrivate];
 }
 
-// the button in the field and the card follow the phase of the translation of the page that is shown
+// the card follows the phase of the translation of the page that is shown
 - (void)updateTranslationAnimated:(BOOL)animated {
     YZTranslation *translation = [self currentTranslation];
     YZTranslationPhase phase = translation ? translation.phase : YZTranslationIdle;
     BOOL visible = phase != YZTranslationIdle && ![[self currentTab] isBlank];
-    BOOL showButton = visible && !_editing;
-    if (showButton != !_translateButton.hidden) {
-        _translateButton.hidden = !showButton;
-        [self layoutChrome];
-        if (showButton && animated)
-            YZMotionAnimateEnter(_translateButton, CGAffineTransformMakeScale(0.4f, 0.4f), 0, YOZORA_MOTION_WOBBLE, 0);
-    }
-    BOOL active = phase == YZTranslationWorking || phase == YZTranslationDone;
-    // the classic field has one color of ink for its keys, the reload key's; the modern one lights the key while the page is translated
-    UIColor *translateInk = active && ![YZTheme isClassic] ? [YZTheme fieldAccentColor] : [YZTheme fieldHintColor];
-    [_translateButton setImage:[YZTheme icon:YZIconTranslate size:22 color:translateInk] forState:UIControlStateNormal];
-    // the glyph breathes while the texts are sent
-    if (phase == YZTranslationWorking && ![_translateButton.layer animationForKey:@"breath"]) {
-        CABasicAnimation *breath = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
-        breath.fromValue = [NSNumber numberWithFloat:1.0f];
-        breath.toValue = [NSNumber numberWithFloat:1.18f];
-        breath.duration = 0.55;
-        breath.autoreverses = YES;
-        breath.repeatCount = HUGE_VALF;
-        breath.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
-        [_translateButton.layer addAnimation:breath forKey:@"breath"];
-    } else if (phase != YZTranslationWorking)
-        [_translateButton.layer removeAnimationForKey:@"breath"];
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(hideFinishedTranslateBar) object:nil];
     // a card that was closed stays closed until the phase changes
     if ((int)phase != _translateBarDismissedPhase)
         _translateBarDismissedPhase = -1;
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(translateOfferTimedOut) object:nil];
-    // an offer the person keeps closing is not made again by itself, the button in the field and the menu still translate
+    // an offer the person keeps closing is not made again by itself, the menu still translates
     BOOL muted = phase == YZTranslationOffered && [self translateOffersMuted];
     BOOL showBar = visible && !_editing && !muted && (int)phase != _translateBarDismissedPhase;
     if (showBar) {
@@ -1231,10 +1207,6 @@ static void YZOpenInOtherApp(NSURL *url, BOOL universalOnly, void (^done)(BOOL o
             _translateBar.transform = CGAffineTransformIdentity;
         }
     });
-}
-
-- (void)translateButtonPressed {
-    [self presentTranslateSheet];
 }
 
 - (void)presentTranslateSheet {
@@ -1592,8 +1564,14 @@ static const CGFloat YZTabStripHeight = 44;
     CGFloat endPad = classicField ? 8 : 4;
     CGFloat keyTop = (fieldHeight - key) / 2;
     _reloadButton.frame = CGRectMake(_field.bounds.size.width - key - endPad, keyTop, key, key);
-    _translateButton.frame = CGRectMake(CGRectGetMinX(_reloadButton.frame) - key - 2, keyTop, key, key);
-    CGFloat inputLeft = 40, inputRight = _editing ? 14 : (_field.bounds.size.width - CGRectGetMinX(_reloadButton.frame)) + (_translateButton.hidden ? 0 : key + 2);
+    // the microphone stands where the reload key does when the page is blank and while the address is typed. there it also keeps the end of the text
+    if (!_voiceKnown) {
+        _voiceKnown = YES;
+        _voiceAvailable = [YZVoiceInput available];
+    }
+    _micButton.hidden = !_voiceAvailable || !([[self currentTab] isBlank] || _editing);
+    _micButton.frame = _reloadButton.frame;
+    CGFloat inputLeft = 40, inputRight = _editing ? (_micButton.hidden ? 14 : key + 14) : (_field.bounds.size.width - CGRectGetMinX(_reloadButton.frame));
     if (!_editing) {
         // the address is centered in the field, so it keeps the same room on both sides and does not move when the translate key comes
         inputLeft = MAX(inputLeft, inputRight);
@@ -1752,6 +1730,8 @@ static const CGFloat YZTabStripHeight = 44;
         [_reloadButton setImage:[YZTheme chromeIcon:(loading ? YZIconStop : YZIconReload) size:[YZTheme isFlat] ? 18 : 20 color:[YZTheme fieldHintColor]]
                        forState:UIControlStateNormal];
         _reloadButton.hidden = blank || _editing;
+        // the microphone takes the place of the reload key on a blank page
+        [self.view setNeedsLayout];
         _reloadButton.accessibilityLabel = loading ? YZT(@"Остановить") : YZT(@"Обновить");
         // a blank private tab shows the mask of the private session where a blank tab shows the search glass
         _securityView.image = [YZTheme chromeIcon:(blank ? ([YZSettings incognito] ? YZIconIncognito : YZIconSearch) : YZIconLock) size:[YZTheme isFlat] ? 16 : 20
@@ -3002,6 +2982,60 @@ typedef enum {
     [_input resignFirstResponder];
 }
 
+#pragma mark voice
+
+// a microphone drawn here: a capsule, the arc that holds it and a stem, in the thin line of the other keys of the field
+static UIImage *YZMicImage(CGFloat size, UIColor *color) {
+    UIGraphicsBeginImageContextWithOptions(CGSizeMake(size, size), NO, 0);
+    CGFloat unit = size / 24, line = 2 * unit;
+    [color setStroke];
+    UIBezierPath *capsule = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(9 * unit, 3 * unit, 6 * unit, 11 * unit) cornerRadius:3 * unit];
+    capsule.lineWidth = line;
+    [capsule stroke];
+    UIBezierPath *arc = [UIBezierPath bezierPathWithArcCenter:CGPointMake(12 * unit, 11 * unit) radius:7 * unit startAngle:0 endAngle:(CGFloat)M_PI clockwise:YES];
+    arc.lineWidth = line;
+    arc.lineCapStyle = kCGLineCapRound;
+    [arc stroke];
+    UIBezierPath *stem = [UIBezierPath bezierPath];
+    [stem moveToPoint:CGPointMake(12 * unit, 18 * unit)];
+    [stem addLineToPoint:CGPointMake(12 * unit, 21 * unit)];
+    [stem moveToPoint:CGPointMake(8.5f * unit, 21 * unit)];
+    [stem addLineToPoint:CGPointMake(15.5f * unit, 21 * unit)];
+    stem.lineWidth = line;
+    stem.lineCapStyle = kCGLineCapRound;
+    [stem stroke];
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return image;
+}
+
+// the key is the accent while the phone listens
+- (void)paintMic:(BOOL)listening {
+    [_micButton setImage:YZMicImage(22, listening ? [YZTheme accentColor] : [YZTheme fieldHintColor]) forState:UIControlStateNormal];
+}
+
+// a press listens and the words are put in the field as they come, the last version is the search. a second press ends the listening
+- (void)micPressed {
+    if (!_voice)
+        _voice = [[YZVoiceInput alloc] init];
+    if ([_voice isListening]) {
+        [_voice stop];
+        return;
+    }
+    [self paintMic:YES];
+    [_voice startWithPartial:^(NSString *text, BOOL final) {
+        _input.text = text;
+        if (!final)
+            return;
+        [self paintMic:NO];
+        [_input resignFirstResponder];
+        [self openAddressText:text];
+    } failed:^(NSString *reason) {
+        [self paintMic:NO];
+        [self showError:reason];
+    }];
+}
+
 // suggestions wait for a pause in typing, rebuilding per key held the next key back on an old phone
 - (void)inputChanged {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(refreshSuggestions) object:nil];
@@ -3223,6 +3257,8 @@ typedef enum {
     [_securityView release];
     [_input release];
     [_reloadButton release];
+    [_micButton release];
+    [_voice release];
     [_cancelButton release];
     [_bottomBar release];
     [_backButton release];

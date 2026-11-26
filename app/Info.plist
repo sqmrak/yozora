@@ -75,6 +75,8 @@
     <!-- a phone with ProMotion runs an app at 120 Hz only when this is set, see YZSetLinkDivisor -->
     <key>CADisableMinimumFrameDurationOnPhone</key><true/>
     <!-- the Documents folder, where the downloads are, shows in the Files app under On My iPhone and in file sharing of a computer -->
+    <key>NSMicrophoneUsageDescription</key><string>Микрофон нужен для голосового поиска в адресной строке</string>
+    <key>NSSpeechRecognitionUsageDescription</key><string>Речь распознаёт система, чтобы вставить сказанное в поиск</string>
     <key>UIFileSharingEnabled</key><true/>
     <key>LSSupportsOpeningDocumentsInPlace</key><true/>
     <!-- the log screen only: pages never see this font, the core catalog reads app/fonts -->
