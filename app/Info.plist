@@ -72,6 +72,8 @@
     <key>YozoraWebKitVersion</key><string>2.54.3</string>
     <key>MinimumOSVersion</key><string>5.0</string>
     <key>LSRequiresIPhoneOS</key><true/>
+    <!-- a phone with ProMotion runs an app at 120 Hz only when this is set, see YZSetLinkDivisor -->
+    <key>CADisableMinimumFrameDurationOnPhone</key><true/>
     <!-- the Documents folder, where the downloads are, shows in the Files app under On My iPhone and in file sharing of a computer -->
     <key>UIFileSharingEnabled</key><true/>
     <key>LSSupportsOpeningDocumentsInPlace</key><true/>

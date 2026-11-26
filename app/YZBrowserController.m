@@ -21,6 +21,22 @@ static NSString *const YZTabsDefaultsKey = @"YZTabs";
 static NSString *const YZCurrentTabDefaultsKey = @"YZCurrentTab";
 static const NSUInteger YZTabLimit = 24;
 static const NSInteger YZBottomSkirtTag = 7701;
+
+// the display link runs at the rate of the screen divided by divisor: 60 and 30 on an ordinary phone, 120 and 60 on a phone with ProMotion, which
+// only gives a third-party app its 120 Hz when the link asks for it (preferredFramesPerSecond, ios 10) and Info.plist allows it
+// (CADisableMinimumFrameDurationOnPhone). before ios 10 the divisor is the old frameInterval
+static void YZSetLinkDivisor(CADisplayLink *link, NSInteger divisor) {
+    SEL preferred = NSSelectorFromString(@"setPreferredFramesPerSecond:");
+    if (![link respondsToSelector:preferred]) {
+        link.frameInterval = divisor;
+        return;
+    }
+    NSInteger maximum = 60;
+    UIScreen *screen = [UIScreen mainScreen];
+    if ([screen respondsToSelector:NSSelectorFromString(@"maximumFramesPerSecond")])
+        maximum = MAX((NSInteger)30, [[screen valueForKey:@"maximumFramesPerSecond"] integerValue]);
+    ((void (*)(id, SEL, NSInteger))(void *)objc_msgSend)(link, preferred, MAX((NSInteger)1, maximum / divisor));
+}
 static const NSUInteger YZSuggestionLimit = 6;
 // the tray shows a page as wide as the screen in the stack of the flat design: the preview is as wide as the screen in pixels (at most 800),
 // 280 was enough for the cards of the grid and was stretched to twice its size here
@@ -387,7 +403,7 @@ static UIImage *YZThumbnailFromView(UIView *view) {
     target->controller = self;
     _linkTarget = target;
     _link = [[CADisplayLink displayLinkWithTarget:target selector:@selector(fire:)] retain];
-    _link.frameInterval = 1;
+    YZSetLinkDivisor(_link, 1);
     [_link addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
 
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardChanged:)
@@ -2032,9 +2048,9 @@ static const CGFloat YZTabStripHeight = 44;
     [self updateChromeForced:NO];
     // keep moving pages at display rate, quiet pages still notice a new scene within two display frames
     if (link.timestamp - _lastSceneTime < 0.2 || _pageView.active || state == YOZORA_LOAD_LOADING || yozora_core_painting(_core))
-        link.frameInterval = 1;
+        YZSetLinkDivisor(link, 1);
     else
-        link.frameInterval = [[self currentTab] isBlank] && state == YOZORA_LOAD_IDLE ? 6 : 2;
+        YZSetLinkDivisor(link, [[self currentTab] isBlank] && state == YOZORA_LOAD_IDLE ? 6 : 2);
     if (_popupMode) {
         _menuButton.enabled = NO;
         _shareButton.enabled = NO;
