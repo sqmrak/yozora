@@ -2912,6 +2912,21 @@ env = { YOZORA_TC = "${TC}" }
 inputs = ["packaging/DEBIAN/*", "scripts/build_deb.sh", "app/Info.plist", "tools/yozora-jit.entitlements"]
 outputs = ["build/ipa/Yozora-v${field:packaging/DEBIAN/control:Version}.deb"]
 
+# the package of one cpu slice each, for the repository: the universal one is over the 100 MiB github takes
+[step.deb-arm64]
+run = [["bash", "scripts/build_deb.sh"]]
+needs = ["ipa-arm64"]
+env = { YOZORA_TC = "${TC}", YOZORA_DEB_SLICE = "arm64" }
+inputs = ["packaging/DEBIAN/*", "scripts/build_deb.sh", "app/Info.plist", "tools/yozora-jit.entitlements"]
+outputs = ["build/ipa/Yozora-v${field:packaging/DEBIAN/control:Version}-arm64.deb"]
+
+[step.deb-armv7]
+run = [["bash", "scripts/build_deb.sh"]]
+needs = ["ipa-armv7"]
+env = { YOZORA_TC = "${TC}", YOZORA_DEB_SLICE = "armv7" }
+inputs = ["packaging/DEBIAN/*", "scripts/build_deb.sh", "app/Info.plist", "tools/yozora-jit.entitlements"]
+outputs = ["build/ipa/Yozora-v${field:packaging/DEBIAN/control:Version}-armv7.deb"]
+
 [step.core-fetch]
 run = [["python3", "-B", "scripts/fetch_core.py"]]
 inputs = ["core/source.json", "scripts/fetch_core.py"]

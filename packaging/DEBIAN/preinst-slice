@@ -1,0 +1,39 @@
+#!/bin/sh
+# the package of one cpu slice stops before any file is unpacked when this device cannot run it, with a line that says
+# which package to take instead. build_deb.sh puts the slice in place of @SLICE@
+SLICE=@SLICE@
+
+case "$1" in
+  install|upgrade) ;;
+  *) exit 0 ;;
+esac
+
+# the model is the one thing every jailbreak can read: uname -m answers iPhone10,3 on ios. the first 64-bit models are
+# iPhone6, iPad4 and iPod7, an unknown model is let through rather than refused on a guess
+model=$(uname -m 2>/dev/null)
+major=
+case "$model" in
+  iPhone*) major=${model#iPhone}; first64=6 ;;
+  iPad*) major=${model#iPad}; first64=4 ;;
+  iPod*) major=${model#iPod}; first64=7 ;;
+esac
+major=${major%%,*}
+case "$major" in
+  ''|*[!0-9]*) exit 0 ;;
+esac
+if [ "$major" -ge "$first64" ]; then cpu64=1; else cpu64=0; fi
+
+# ios 11 runs no 32-bit code, the version is read from the plist every ios has
+version=$(grep -A1 ProductVersion /System/Library/CoreServices/SystemVersion.plist 2>/dev/null | sed -n 's/.*<string>\([0-9]*\).*/\1/p')
+
+if [ "$SLICE" = arm64 ] && [ "$cpu64" = 0 ]; then
+  echo "Yozora (arm64) does not run on $model: its processor is 32-bit. Install Yozora (armv7) instead." >&2
+  echo "Yozora (arm64) не работает на $model: процессор 32-битный. Установите Yozora (armv7)." >&2
+  exit 1
+fi
+if [ "$SLICE" = armv7 ] && [ "$cpu64" = 1 ] && [ -n "$version" ] && [ "$version" -ge 11 ]; then
+  echo "Yozora (armv7) does not run on iOS $version: it runs no 32-bit apps. Install Yozora (arm64) instead." >&2
+  echo "Yozora (armv7) не работает на iOS $version: 32-битные приложения не запускаются. Установите Yozora (arm64)." >&2
+  exit 1
+fi
+exit 0
