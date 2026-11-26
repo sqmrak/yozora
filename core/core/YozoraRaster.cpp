@@ -59,6 +59,8 @@ struct yozora_scene {
     }
 };
 
+extern "C" size_t yozora_scene_tile_size(void) { return sizeof(yozora_scene_tile); }
+
 extern "C" void yozora_scene_retain(yozora_scene* scene)
 {
     if (scene)

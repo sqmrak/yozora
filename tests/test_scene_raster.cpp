@@ -1022,6 +1022,7 @@ static void testCoarseWhileMoving()
 
 int main(int argc, char** argv)
 {
+    assert(yozora_scene_tile_size() == sizeof(yozora_scene_tile));
     if (argc == 2 && !std::strcmp(argv[1], "--benchmark")) {
         benchmarkTileVersionLookup();
         return 0;

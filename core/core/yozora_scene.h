@@ -66,6 +66,9 @@ typedef struct {
 /* evaluates supported compositor animations, returns zero outside their active and fill ranges */
 int yozora_scene_animation_values(const yozora_scene_animation *animation, double elapsed, double values[16]);
 
+/* the app checks the renderer layout before reading a tile */
+size_t yozora_scene_tile_size(void);
+
 /* scene metadata is immutable, image providers retain individual pixel owners */
 void yozora_scene_retain(yozora_scene *scene);
 void yozora_scene_release(yozora_scene *scene);

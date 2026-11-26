@@ -96,6 +96,10 @@ static void YZSceneReleasePixels(void *context, const void *data, size_t size) {
         space = CGColorSpaceCreateDeviceRGB();
     if (!scene || *yozora_scene_error(scene))
         return;
+    if (yozora_scene_tile_size() != sizeof(yozora_scene_tile)) {
+        NSLog(@"yozora: renderer and app disagree on scene tile layout");
+        return;
+    }
     yozora_scene_retain(scene);
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
