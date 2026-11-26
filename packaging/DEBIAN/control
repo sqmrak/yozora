@@ -1,6 +1,6 @@
 Package: com.sqmrak.yozora
 Name: Yozora
-Version: 1.5.0-stable
+Version: 2.0.0-stable
 Architecture: all
 Description: web browser with an own webkit engine for jailbroken iOS 5 and later (armv7 + arm64)
 Maintainer: sqmrak
